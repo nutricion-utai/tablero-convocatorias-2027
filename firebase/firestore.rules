@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Tablero de envíos del menú (lectura pública)
+    // https://nutricion-utai.github.io/tablero-envios-pncm/
+    match /periodos/{documento=**} {
+      allow read: if true;
+    }
+    match /tablero/{documento=**} {
+      allow read: if true;
+    }
+
+    // Tablero de convocatorias de alimentos 2027 (solo con la clave)
+    // https://nutricion-utai.github.io/tablero-convocatorias-2027/
+    // La clave es la contraseña del usuario lector de Firebase Authentication.
+    match /conv2027/{documento=**} {
+      allow read: if request.auth != null
+                  && request.auth.token.email == 'lector@nutricion-utai.github.io';
+    }
+
+    // Desde el navegador no se escribe nada. Escriben solo los Apps Script del
+    // propietario, que no pasan por estas reglas.
+  }
+}
