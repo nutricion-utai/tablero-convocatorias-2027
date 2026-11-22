@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Convocatorias de alimentos 2027 · PNCM</title>
+<meta name="robots" content="noindex">
+<meta name="description" content="Avance de los procesos de adquisición de alimentos 2027 de las UT/OCT del Programa Nacional Cuna Más.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B3A66'/%3E%3Crect x='7' y='17' width='4' height='8' rx='1.5' fill='%23BDD300'/%3E%3Crect x='14' y='12' width='4' height='13' rx='1.5' fill='%23fff'/%3E%3Crect x='21' y='7' width='4' height='18' rx='1.5' fill='%23fff'/%3E%3C/svg%3E">
+<style>
+:root{color-scheme:light;--bg:#F4F7FA;--surface:#FFFFFF;--ink:#13212E;--ink2:#3E4F5E;--muted:#6B7A88;--rule:#DCE3EA;--grid:#E8EDF2;
+  --band:#0B3A66;--band-ink:#FFFFFF;--azul:#007AC7;--azul-soft:#E2EFF9;--lima:#BDD300;--lima-soft:#F3F8D0;
+  --s-cp:#007AC7;--s-af:#008300;--s-cp-t:#BFDDF1;--s-af-t:#BFE0BF;
+  --ok:#1E7B3E;--ok-soft:#DDF1E3;--warn:#9A5B00;--warn-soft:#FBEFD9;--bad:#B42318;--bad-soft:#FCE4E2;--gray-soft:#EEF1F4;
+  --f-body:"Source Sans 3","Segoe UI",Arial,sans-serif;--f-display:"Archivo","Arial Narrow",Arial,sans-serif;--r:10px}
+@media (prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#0E151C;--surface:#151F29;--ink:#E6EDF3;--ink2:#B9C6D2;--muted:#7E8C99;--rule:#25323E;--grid:#1E2A35;
+  --band:#0A2744;--band-ink:#F2F6FA;--azul:#2F92D6;--azul-soft:#16304A;--lima:#C9DE2E;--lima-soft:#2C3410;
+  --s-cp:#3987E5;--s-af:#0CA30C;--s-cp-t:#1F3E5E;--s-af-t:#1E3F1E;
+  --ok:#4FBF74;--ok-soft:#173A24;--warn:#E3A33B;--warn-soft:#3A2C12;--bad:#F2877D;--bad-soft:#3D1D1B;--gray-soft:#1C2834}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 var(--f-body)}
+body.con-modal{overflow:hidden}
+button{font:inherit;color:inherit}
+h1,h2,h3,h4{font-family:var(--f-display);letter-spacing:-.01em;margin:0}
+.wrap{max-width:1320px;margin:0 auto;padding:0 20px}
+.muted{color:var(--muted)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.tn{font-variant-numeric:tabular-nums}
+
+/* cabecera */
+.band{background:var(--band);color:var(--band-ink)}
+.hdr{display:flex;gap:16px;align-items:flex-end;justify-content:space-between;padding-top:20px;padding-bottom:14px;flex-wrap:wrap}
+.eyebrow{font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.85}
+.band .eyebrow{color:var(--lima);opacity:1}
+.hdr h1{font-size:30px;font-weight:800;line-height:1.1;margin-top:2px}
+.hdr .sub{margin:4px 0 0;font-size:15px;opacity:.85}
+.hdr-der{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.vivo{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;background:rgba(255,255,255,.1);border-radius:999px;padding:5px 12px;max-width:520px}
+.vivo span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv{flex:none;width:9px;height:9px;border-radius:50%;background:#9AA4AE}
+.vivo.ok .pv{background:#3DD27A;box-shadow:0 0 0 0 rgba(61,210,122,.6);animation:latido 2s infinite}
+.vivo.err .pv{background:#F2877D}
+.pv.nuevo{background:var(--lima)}
+@keyframes latido{0%{box-shadow:0 0 0 0 rgba(61,210,122,.55)}70%{box-shadow:0 0 0 8px rgba(61,210,122,0)}100%{box-shadow:0 0 0 0 rgba(61,210,122,0)}}
+@media (prefers-reduced-motion:reduce){.vivo.ok .pv{animation:none}}
+.btn-sal{background:transparent;border:1px solid rgba(255,255,255,.45);color:var(--band-ink);border-radius:8px;padding:5px 12px;font-size:13.5px;cursor:pointer}
+.btn-sal:hover{background:rgba(255,255,255,.12)}
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tabs button{background:none;border:0;color:var(--band-ink);opacity:.75;padding:10px 14px 11px;font-weight:600;font-size:15px;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap}
+.tabs button:hover{opacity:1}
+.tabs button.on{opacity:1;border-bottom-color:var(--lima)}
+
+/* barra de filtros */
+.bar{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--rule);box-shadow:0 2px 8px rgba(11,58,102,.06)}
+.bar .wrap{display:flex;gap:10px 14px;align-items:flex-end;flex-wrap:wrap;padding-top:10px;padding-bottom:10px}
+.fgrp{display:flex;flex-direction:column;gap:2px;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.fgrp select,.fgrp input,.der input,.sel select{font:inherit;font-size:14.5px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:8px;padding:6px 10px;min-width:150px;max-width:260px}
+.fgrp input{min-width:220px}
+.limpiar{font-size:13.5px;font-weight:600;padding:6px 12px;border:1px solid var(--azul);border-radius:8px;background:var(--surface);color:var(--azul);cursor:pointer}
+.limpiar:hover:not(:disabled){background:var(--azul);color:#fff}
+.limpiar:disabled{border-color:var(--rule);color:var(--muted);cursor:default}
+#chips{display:flex;gap:6px;flex-wrap:wrap;align-self:center}
+.fchip{border:0;background:var(--azul-soft);color:var(--ink);border-radius:999px;padding:4px 10px;font-size:13px;font-weight:600;cursor:pointer}
+.fchip:hover{background:var(--azul);color:#fff}
+
+main{padding-top:18px;padding-bottom:30px}
+section[hidden]{display:none}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);padding:16px 18px;margin-bottom:16px}
+.card h2{font-size:19px;font-weight:700;margin-bottom:4px}
+.cab{display:flex;gap:6px 14px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px}
+.cab h2{margin:0}
+.cab .der{margin-left:auto;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.nota{font-size:14px;color:var(--muted);margin:0 0 10px}
+.cab .nota{margin:0}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g2 .card{margin-bottom:16px}
+@media (max-width:900px){.g2{grid-template-columns:1fr;gap:0}}
+.btn{font-size:14px;font-weight:600;padding:6px 12px;border:1px solid var(--azul);border-radius:8px;background:var(--azul);color:#fff;cursor:pointer}
+.btn:hover{filter:brightness(1.08)}
+.sel{font-size:13.5px;color:var(--muted);display:flex;gap:6px;align-items:center}
+.sel select{min-width:0}
+.lnk{background:none;border:0;padding:0;color:var(--azul);font-weight:600;cursor:pointer;text-align:left;text-decoration:underline;text-decoration-color:transparent;text-underline-offset:2px}
+.lnk:hover{text-decoration-color:currentColor}
+.vacio{padding:26px 10px;text-align:center;color:var(--muted);font-size:15px}
+.cobertura{margin:-4px 0 16px;color:var(--ink2);font-size:15px}
+
+/* tarjetas de cifras */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px}
+.kpi{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);padding:12px 14px;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.kpi.fijo{cursor:default}
+.kpi b{font-size:30px;line-height:1.1;font-weight:700;color:var(--azul)}
+.kpi span{font-size:14px;color:var(--ink2)}
+.kpi em{font-style:normal;font-weight:700}
+.kpi em.crit{color:var(--bad)}
+button.kpi:hover{border-color:var(--azul)}
+.kpi.activo{border-color:var(--azul);box-shadow:inset 0 0 0 1px var(--azul);background:var(--azul-soft)}
+
+/* barras horizontales (una serie) */
+.hbars{display:flex;flex-direction:column;gap:3px}
+.hb{display:grid;grid-template-columns:minmax(150px,42%) 1fr 64px;gap:10px;align-items:center;background:none;border:0;padding:3px 4px;border-radius:6px;text-align:left;cursor:pointer;min-height:26px}
+.hb.fija{cursor:default}
+.hb:hover,.hb:focus-visible{background:var(--gray-soft)}
+.hb.on{background:var(--azul-soft)}
+.hb-l{font-size:14px;color:var(--ink2);line-height:1.2}
+.hb-t{height:14px;position:relative}
+.hb-f{position:absolute;left:0;top:0;bottom:0;background:var(--s-cp);border-radius:0 4px 4px 0;transition:width .3s}
+.hb-f.afc{background:var(--s-af)}
+.hb.gris .hb-f{background:var(--muted);opacity:.55}
+.hb-v{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.hb.cero .hb-l,.hb.cero .hb-v{color:var(--muted);font-weight:400}
+.hb-sep{font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:8px 4px 2px;border-top:1px solid var(--grid);padding-top:6px}
+.hb-sep:first-child{border-top:0;margin-top:0;padding-top:0}
+#vPre .hb{grid-template-columns:minmax(150px,30%) 1fr 130px}
+
+/* tablas */
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.tb{width:100%;border-collapse:collapse;font-size:14.5px}
+.tb th{font-size:12.5px;font-weight:700;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--rule);white-space:nowrap;text-transform:uppercase;letter-spacing:.03em}
+.tb td{padding:8px 10px;border-bottom:1px solid var(--grid);vertical-align:top}
+.tb .n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tb .nro{color:var(--muted);width:1%;font-variant-numeric:tabular-nums}
+.tb .sm{font-size:13.5px}
+.tb tr.fila{cursor:pointer}
+.tb tr.fila:hover td,.tb tr.fila:focus-visible td{background:var(--gray-soft)}
+.tb tr.sinp td{color:var(--muted)}
+.tb tr.cur td{background:var(--azul-soft)}
+.tb tr.nuevo td{animation:destello 8s ease-out}
+@keyframes destello{0%,30%{background:var(--lima-soft)}100%{background:transparent}}
+.tb .t1{font-weight:700}
+.tb .t2{font-size:14px;color:var(--ink2)}
+.tb .t3{font-size:12.5px;color:var(--muted);margin-top:2px}
+.tb tr.det>td{background:var(--bg);padding:6px 10px 12px}
+.tb.in{font-size:13.5px;background:var(--surface);border:1px solid var(--rule);border-radius:8px}
+.tb.in th{font-size:11.5px}
+.flecha{color:var(--muted);display:inline-block;width:12px}
+.avc{min-width:170px;white-space:nowrap}
+.avt{min-width:210px}
+.act-curso{color:var(--ink)}
+.act-sin{color:var(--muted)}
+.av{display:inline-block;vertical-align:middle;width:110px;height:8px;border-radius:999px;background:var(--azul-soft);overflow:hidden}
+.av span{display:block;height:100%;background:var(--s-cp);border-radius:999px}
+
+/* chips, estados, etiquetas */
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:var(--ink2);background:var(--gray-soft);border-radius:999px;padding:1px 8px;vertical-align:1px;white-space:nowrap;font-family:var(--f-body)}
+.chip i{width:8px;height:8px;border-radius:50%;background:var(--s-cp)}
+.chip.af i{background:var(--s-af)}
+.est{display:inline-flex;gap:5px;align-items:center;font-size:13px;font-weight:700;border-radius:6px;padding:2px 8px;white-space:nowrap;background:var(--gray-soft);color:var(--ink2)}
+.est.e-convocado{background:var(--azul-soft);color:var(--azul)}
+.est.e-enevaluacion{background:var(--lima-soft);color:var(--ink)}
+.est.e-adjudicado{background:var(--ok-soft);color:var(--ok)}
+.est.e-desierto{background:var(--warn-soft);color:var(--warn)}
+.est.e-cancelado{text-decoration:line-through}
+.tag{display:inline-block;font-size:11.5px;font-weight:700;border-radius:5px;padding:1px 6px;white-space:nowrap}
+.tag.crit{background:var(--bad-soft);color:var(--bad)}
+.tag.crit::before{content:"! "}
+.tag.warn{background:var(--warn-soft);color:var(--warn)}
+.tag.info{background:var(--azul-soft);color:var(--azul)}
+.rp{display:inline-block;font-size:12.5px;font-weight:600;border-radius:5px;padding:0 6px;margin:1px 0;background:var(--gray-soft)}
+.rp.r-adjudicado{background:var(--ok-soft);color:var(--ok)}
+.rp.r-desierto{background:var(--warn-soft);color:var(--warn)}
+.card.alerta{border-color:var(--bad);border-left-width:4px}
+.card.alerta h2{display:flex;gap:8px;align-items:center}
+.ico-crit{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--bad);color:#fff;font-size:14px;font-weight:800}
+.lista-al{margin:0;padding-left:18px}
+.lista-al li{margin:5px 0;font-size:14.5px}
+
+/* rango de precios */
+.rango{display:inline-block;position:relative;width:90px;height:12px;vertical-align:middle}
+.rg-l{position:absolute;left:0;right:0;top:5px;height:2px;background:var(--rule);border-radius:2px}
+.rg-l::before,.rg-l::after{content:"";position:absolute;top:-3px;width:2px;height:8px;background:var(--muted)}
+.rg-l::before{left:0}.rg-l::after{right:0}
+.rango.uno .rg-l{display:none}
+.rg-m{position:absolute;top:2px;width:8px;height:8px;margin-left:-4px;border-radius:50%;background:var(--s-cp);box-shadow:0 0 0 2px var(--surface)}
+
+/* agenda */
+.agenda{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.ag-dia{border:1px solid var(--rule);border-radius:8px;padding:10px 12px}
+.ag-f{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--grid);padding-bottom:4px;margin-bottom:4px}
+.ag-f b{font-family:var(--f-display)}
+.ag-f span{font-size:13px;color:var(--muted)}
+.ag-dia ul{list-style:none;margin:0;padding:0}
+.ag-dia li{font-size:14px;padding:5px 0;border-bottom:1px solid var(--grid)}
+.ag-dia li:last-child{border-bottom:0}
+.ag-dia li .ag-l2{margin-top:1px}
+.ag-a{font-weight:600}
+
+/* Gantt */
+.ley{display:flex;gap:14px;flex-wrap:wrap;font-size:13.5px;color:var(--ink2)}
+.ley span{display:inline-flex;align-items:center;gap:6px}
+.sw{display:inline-block;width:14px;height:10px;border-radius:2px;background:var(--s-cp)}
+.sw.af{background:var(--s-af)}
+.sw.hoy{width:2px;height:14px;background:var(--bad)}
+.gantt{position:relative;min-width:760px}
+.g-ej,.g-f{display:grid;grid-template-columns:230px 1fr;align-items:center}
+.g-ej{height:26px;border-bottom:1px solid var(--rule);font-size:12px;color:var(--muted);position:sticky;top:0}
+.g-t{position:relative;height:100%}
+.g-f{height:28px;cursor:pointer;border-bottom:1px solid var(--grid)}
+.g-f:hover,.g-f:focus-visible{background:var(--gray-soft)}
+.g-l{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:10px}
+.gx{position:absolute;top:0;bottom:0;border-left:1px solid var(--grid)}
+.gx span{position:absolute;left:4px;top:5px;white-space:nowrap}
+.g-hoy-l{position:absolute;top:4px;transform:translateX(-50%);background:var(--bad);color:#fff;font-weight:700;font-size:11px;border-radius:4px;padding:0 5px;z-index:2}
+.g-linea{position:absolute;top:26px;bottom:0;left:calc(230px + (100% - 230px) * var(--hoy) / 100);width:2px;margin-left:-1px;background:var(--bad);opacity:.8;pointer-events:none}
+.sg{position:absolute;top:8px;height:12px;background:var(--s-cp);border-left:2px solid var(--surface)}
+.g-f.af .sg{background:var(--s-af)}
+.sg.fut{background:var(--s-cp-t)}
+.g-f.af .sg.fut{background:var(--s-af-t)}
+.sg:last-child{border-radius:0 4px 4px 0}
+.sg.cur{top:6px;height:16px;border-radius:3px;box-shadow:0 0 0 2px var(--surface)}
+.g-f:hover .g-t .gx{border-color:var(--rule)}
+
+/* actividad */
+.feed{list-style:none;margin:0;padding:0}
+.feed li{display:grid;grid-template-columns:150px 1fr;gap:12px;padding:9px 0;border-bottom:1px solid var(--grid);font-size:14.5px}
+.feed .hora{color:var(--muted);font-size:13.5px}
+
+/* detalle */
+#modal{position:fixed;inset:0;z-index:50;background:rgba(9,22,36,.55);display:flex;justify-content:flex-end}
+#modal[hidden]{display:none}
+#modal .caja{position:relative;background:var(--surface);width:min(860px,100%);height:100%;overflow-y:auto;padding:22px 26px 30px;box-shadow:-8px 0 24px rgba(0,0,0,.18);animation:entra .2s ease-out}
+@keyframes entra{from{transform:translateX(30px);opacity:.4}to{transform:none;opacity:1}}
+.cerrar{position:absolute;top:12px;right:14px;width:36px;height:36px;border-radius:50%;border:1px solid var(--rule);background:var(--surface);font-size:22px;line-height:1;cursor:pointer;color:var(--ink2)}
+.cerrar:hover{background:var(--gray-soft)}
+.m-cab{padding-right:40px;border-bottom:1px solid var(--rule);padding-bottom:12px;margin-bottom:6px}
+.m-cab .eyebrow{color:var(--azul)}
+.m-cab h2{font-size:24px;margin:2px 0 6px}
+.m-cab h2 .muted{font-size:16px;font-weight:600}
+.m-est{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:14.5px}
+.m-dat{display:flex;gap:6px 18px;flex-wrap:wrap;font-size:14px;color:var(--ink2);margin-top:8px}
+.m-nota{font-size:14px;background:var(--warn-soft);border-radius:6px;padding:6px 10px;margin:8px 0 0}
+#modal section{margin-top:18px}
+#modal h3{font-size:16.5px;margin-bottom:8px;display:flex;gap:8px;align-items:center}
+#modal h4{font-size:14.5px;margin:12px 0 4px}
+#modal p{margin:4px 0;font-size:14.5px}
+.pasos{display:grid;grid-template-columns:1fr 1.4fr;gap:14px}
+@media (max-width:700px){.pasos{grid-template-columns:1fr}}
+.et-t{font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:4px}
+.pasos ol{list-style:none;margin:0;padding:0}
+.pasos li{font-size:14px;padding:4px 4px 4px 26px;position:relative;border-bottom:1px solid var(--grid);display:flex;flex-wrap:wrap;gap:0 6px;align-items:baseline}
+.pasos li .ptx{flex:1 1 180px}
+.pasos .pi{position:absolute;left:2px;top:4px;width:18px;text-align:center;font-weight:800}
+.pasos .pn{color:var(--muted);font-variant-numeric:tabular-nums}
+.pasos .pe{margin-left:auto;font-size:12px;color:var(--muted);white-space:nowrap}
+.pasos li .t3{flex-basis:100%}
+.pasos li.ok .pi{color:var(--ok)}
+.pasos li.vig{background:var(--azul-soft)}
+.pasos li.vig .pi,.pasos li.vig .pe{color:var(--azul);font-weight:700}
+.pasos li.dat .pi::before{content:"";display:inline-block;width:11px;height:11px;border-radius:50%;border:2px solid var(--warn);background:linear-gradient(90deg,var(--warn) 50%,transparent 50%);vertical-align:-1px}
+.pasos li.pen{color:var(--muted)}
+.m-amb{display:flex;gap:8px 20px;flex-wrap:wrap;font-size:15px;margin-bottom:6px}
+.m-amb b{font-size:18px;color:var(--azul)}
+.paqs{margin:6px 0 0;padding-left:18px;font-size:14px}
+.m-pie{margin-top:22px;font-size:12.5px}
+
+/* tooltip y aviso */
+#tip{position:fixed;z-index:60;max-width:320px;background:var(--ink);color:var(--surface);font-size:13px;line-height:1.35;border-radius:6px;padding:6px 9px;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.2)}
+#tip b{font-size:14px}
+#toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:55;display:flex;gap:10px;align-items:center;max-width:min(680px,calc(100% - 24px));background:var(--band);color:var(--band-ink);border-radius:999px;padding:9px 18px;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+#toast .muted{color:inherit;opacity:.7}
+#toast[hidden]{display:none}
+#toast.entra{animation:sube .3s ease-out}
+#toast.sale{opacity:0;transition:opacity .4s}
+@keyframes sube{from{transform:translate(-50%,20px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+
+/* ingreso */
+#login{position:fixed;inset:0;z-index:70;background:var(--band);display:grid;place-items:center;padding:20px}
+#login[hidden]{display:none}
+.lg-caja{background:var(--surface);color:var(--ink);border-radius:14px;padding:28px 28px 22px;width:min(420px,100%);box-shadow:0 20px 50px rgba(0,0,0,.35)}
+.lg-caja .eyebrow{color:var(--azul)}
+.lg-caja h1{font-size:25px;margin:4px 0 6px}
+.lg-caja p{margin:0 0 16px;color:var(--ink2);font-size:15px}
+.lg-caja label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin-bottom:4px}
+.lg-caja input{width:100%;font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(--rule);border-radius:8px;background:var(--surface);color:var(--ink)}
+.lg-caja input:focus{outline:2px solid var(--azul);outline-offset:1px}
+.lg-caja button{width:100%;margin-top:12px;font-size:16px;padding:10px;border-radius:8px;border:0;background:var(--azul);color:#fff;font-weight:700;cursor:pointer}
+.lg-caja button:disabled{opacity:.6;cursor:wait}
+.lg-err{color:var(--bad);font-size:14px;min-height:20px;margin-top:8px}
+.lg-pie{font-size:12.5px;color:var(--muted);margin-top:10px}
+#cargando{padding:60px 20px;text-align:center;color:var(--muted)}
+.pie{font-size:12.5px;color:var(--muted);padding-bottom:26px}
+.pie p{margin:3px 0}
+
+@media (max-width:760px){
+  .wrap{padding:0 12px}
+  .hdr h1{font-size:24px}
+  .fgrp select,.fgrp input{min-width:0;max-width:none;width:100%}
+  .bar .fgrp{flex:1 1 140px}
+  .kpi b{font-size:24px}
+  .hb{grid-template-columns:minmax(110px,44%) 1fr 54px}
+  #vPre .hb{grid-template-columns:minmax(110px,36%) 1fr 96px}
+  .feed li{grid-template-columns:1fr;gap:2px}
+  #modal .caja{padding:18px 14px 26px}
+}
+@media print{.bar,.tabs,#toast,.btn,.btn-sal{display:none}.card{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div id="login" hidden>
+  <form class="lg-caja" id="lgForm" autocomplete="off">
+    <div class="eyebrow">Programa Nacional Cuna Más · UTAI</div>
+    <h1>Convocatorias de alimentos 2027</h1>
+    <p>Tablero de seguimiento de los procesos de adquisición de alimentos de las UT/OCT. Ingrese la clave de acceso que le entregó la UTAI.</p>
+    <label for="lgClave">Clave de acceso</label>
+    <input id="lgClave" type="password" required minlength="6" autocomplete="current-password">
+    <button id="lgBtn" type="submit">Ingresar</button>
+    <div class="lg-err" id="lgErr" role="alert"></div>
+    <div class="lg-pie">La clave se recuerda en este navegador hasta que pulse “Salir”.</div>
+  </form>
+</div>
+
+<header class="band">
+  <div class="wrap hdr">
+    <div>
+      <div class="eyebrow">Programa Nacional Cuna Más · UTAI</div>
+      <h1>Convocatorias de alimentos 2027</h1>
+      <p class="sub">Avance de los procesos de adquisición de alimentos de las UT/OCT, según lo que registran las especialistas en la herramienta de convocatorias</p>
+    </div>
+    <div class="hdr-der"><div id="vivo" class="vivo"><span class="pv"></span><span>Conectando…</span></div><button id="btnSalir" class="btn-sal" type="button">Salir</button></div>
+  </div>
+  <nav class="wrap tabs" role="tablist" aria-label="Vistas del tablero">
+    <button data-vista="res" role="tab" class="on" aria-selected="true">Resumen</button>
+    <button data-vista="pro" role="tab" aria-selected="false">Procesos</button>
+    <button data-vista="cro" role="tab" aria-selected="false">Cronograma</button>
+    <button data-vista="pre" role="tab" aria-selected="false">Resultados y precios</button>
+    <button data-vista="act" role="tab" aria-selected="false">Actividad</button>
+  </nav>
+</header>
+
+<div class="bar">
+  <div class="wrap">
+    <label class="fgrp">Sectorista<select id="fSect"><option value="">Todos</option></select></label>
+    <label class="fgrp">UT/OCT<select id="fUT"><option value="">Todas</option></select></label>
+    <label class="fgrp">Modalidad<select id="fMod">
+      <option value="">Todas</option>
+      <option value="AF">Invitación directa AF</option>
+      <option value="CP">Convocatoria pública (todas)</option>
+      <option value="CP_ZONA">Convocatoria pública por zona</option>
+      <option value="CP_CG">Convocatoria pública por CG</option>
+      <option value="EXC">Modalidad excepcional</option>
+    </select></label>
+    <label class="fgrp">Buscar<input id="fQ" type="search" placeholder="Zona, CG, distrito o especialista"></label>
+    <button id="limpiar" class="limpiar" type="button" disabled>Quitar filtros</button>
+    <div id="chips" hidden></div>
+  </div>
+</div>
+
+<main class="wrap">
+  <div id="cargando">Cargando los procesos…</div>
+  <section id="vRes" role="tabpanel"></section>
+  <section id="vPro" role="tabpanel" hidden></section>
+  <section id="vCro" role="tabpanel" hidden></section>
+  <section id="vPre" role="tabpanel" hidden></section>
+  <section id="vAct" role="tabpanel" hidden></section>
+</main>
+
+<footer class="wrap pie">
+  <p>Fuente: herramienta web de convocatorias de alimentos 2027 de la UTAI, con los datos que registran las especialistas en nutrición de las UT/OCT. No incluye los procesos de prueba.</p>
+  <p>Marco: Directiva “Adquisición de alimentos por los Comités de Gestión en el marco del Modelo de cogestión comunal del Programa Nacional Cuna Más”, versión 8 (RDE N° 002396-2026-MIDIS/PNCM-DE), numeral 7, y Ley N° 31071, Ley de Compras Estatales de Alimentos de Origen en la Agricultura Familiar.</p>
+  <p>Cifras con punto decimal y coma de millares. Los RUC de personas naturales no se publican.</p>
+</footer>
+
+<div id="modal" hidden role="dialog" aria-modal="true" aria-label="Detalle del proceso"><div class="caja"></div></div>
+<div id="tip" role="tooltip" hidden></div>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="logica.js"></script>
+<script src="app.js"></script>
+<script type="module" src="boot.mjs"></script>
+</body>
+</html>
