@@ -17,6 +17,9 @@
  *   - v2.0.45: cada registro de «últimos registros» trae los paquetes que cambió
  *     ese guardado (p: ['NP', 'P1'…]; vacío = datos de toda la zona), para
  *     agruparlos en la página por UT/OCT, zona y paquete.
+ *   - v2.0.46: y el detalle de lo que cambió (d: [[paquete, texto]…]; paquete
+ *     vacío = dato de toda la zona). La lista se guarda en varias propiedades
+ *     (TC_VIVO, TC_VIVO_2…) porque cada una admite unos 9 KB.
  *   - Los procesos de prueba no se publican (y se retiran si cambian a prueba).
  *   - Un activador revisa cada hora todos los procesos y corrige diferencias
  *     (cambios hechos a mano en la base, usuarios, sectorización).
@@ -53,7 +56,9 @@ var TC = {
   PROYECTO: 'tablero-envios-pncm',
   RAIZ: 'conv2027',
   SECTORISTA_RESTO: 'Luis Enrique Gutiérrez López',   // UT/OCT sin sectorista registrado en USUARIOS
-  VIVO_MAX: 40,                                         // registros que muestra el aviso en vivo
+  VIVO_MAX: 60,                                         // registros que muestra el aviso en vivo
+  VIVO_TROZO: 3000,                                     // v2.0.46: caracteres por propiedad (cada una admite ~9 KB)
+  VIVO_PARTES: 15,                                      // v2.0.46: propiedades como máximo para la lista en vivo
   TIEMPO_MAX_MS: 240000,                                // la sincronización se detiene antes del límite de 6 minutos
   LOTE_BYTES: 3000000                                   // tamaño máximo aproximado de cada envío a Firestore
 };
@@ -68,11 +73,15 @@ function tcPublicarProceso_(proc, usuario, anterior) {
     var cambios;
     if (tcEsPrueba_(proc)) cambios = tcBorrarDocs_(proc.id);
     else {
-      var b = tcConstruir_(proc, proc._idx || null, tcContexto_()), paq = [];
+      var b = tcConstruir_(proc, proc._idx || null, tcContexto_()), paq = [], det = [];
       try { paq = tcPaquetesTocados_(anterior, proc); } catch (e) { console.warn('Paquetes del registro ' + proc.id + ': ' + e.message); }
+      // v2.0.46: detalle de lo que cambió; sus paquetes también cuentan para agrupar el registro
+      try { det = tcDetalleCambios_(anterior, proc); } catch (e) { console.warn('Detalle del registro ' + proc.id + ': ' + e.message); }
+      det.forEach(function (x) { if (x[0] && paq.indexOf(x[0]) < 0) paq.push(x[0]); });
+      paq = Calc.PAQUETES.filter(function (c) { return paq.indexOf(c) >= 0; }).concat(paq.filter(function (c) { return Calc.PAQUETES.indexOf(c) < 0; }));
       cambios = tcCambiosDe_(b);
       cambios.push(tcEvento_({ id: proc.id, ut: b.doc.utn, z: b.doc.zona, m: b.doc.mod, c: b.doc.conv,
-        a: Number(proc.version) === 1 ? 'Registró el proceso' : tcTextoAvance_(b.doc), u: tcNombreUsuario_(usuario), p: paq }));
+        a: Number(proc.version) === 1 ? 'Registró el proceso' : tcTextoAvance_(b.doc), u: tcNombreUsuario_(usuario), p: paq, d: det }));
     }
     tcLote_(cambios, 1);
   } catch (e) { tcError_('Publicar ' + (proc && proc.id), e); }
@@ -84,7 +93,7 @@ function tcRetirarProceso_(p, usuario) {
     if (!tcActivo_() || !p || !p.id) return;
     var cambios = tcBorrarDocs_(p.id);
     if (!tcEsPrueba_(p)) cambios.push(tcEvento_({ id: p.id, ut: p.utNombre || p.ut, z: p.zona, m: p.modalidad, c: p.convocatoria,
-      a: 'Eliminó el proceso', u: tcNombreUsuario_(usuario), p: [] }));
+      a: 'Eliminó el proceso', u: tcNombreUsuario_(usuario), p: [], d: [] }));
     tcLote_(cambios, 1);
   } catch (e) { tcError_('Retirar ' + (p && p.id), e); }
 }
@@ -121,7 +130,7 @@ function tcBorrarTablero() {
   });
   ['meta', 'vivo', 'estado'].forEach(function (n) { cambios.push({ ruta: TC.RAIZ + '/' + n, borrar: true }); });
   tcLote_(cambios, 3);
-  try { PropertiesService.getScriptProperties().deleteProperty('TC_VIVO'); } catch (e) { }
+  try { tcVivoGuardar_(PropertiesService.getScriptProperties(), ''); } catch (e) { }
   console.log('Se borraron ' + cambios.length + ' documentos del tablero.');
 }
 
@@ -313,13 +322,26 @@ function tcBorrarDocs_(id) {
 function tcEvento_(e) {
   e.t = tcAhora_();
   var props = PropertiesService.getScriptProperties(), lista = [];
-  try { lista = JSON.parse(props.getProperty('TC_VIVO') || '[]'); } catch (x) { lista = []; }
+  try { lista = JSON.parse(tcVivoLeer_(props) || '[]'); } catch (x) { lista = []; }
   lista.unshift(e);
   lista = lista.slice(0, TC.VIVO_MAX);
-  var d = JSON.stringify(lista);
-  while (d.length > 8500 && lista.length > 5) { lista.pop(); d = JSON.stringify(lista); }
-  props.setProperty('TC_VIVO', d);
+  var d = JSON.stringify(lista), max = TC.VIVO_TROZO * TC.VIVO_PARTES;
+  while (d.length > max && lista.length > 5) { lista.pop(); d = JSON.stringify(lista); }
+  // si no se puede guardar la lista (cuota de propiedades), el registro igual se publica
+  try { tcVivoGuardar_(props, d); } catch (x) { console.warn('Lista en vivo: ' + x.message); }
   return { ruta: TC.RAIZ + '/vivo', datos: { d: d, t: e.t } };
+}
+/** v2.0.46: la lista en vivo va repartida en TC_VIVO, TC_VIVO_2… (cada propiedad admite unos 9 KB). */
+function tcVivoLeer_(props) {
+  var s = props.getProperty('TC_VIVO') || '';
+  for (var i = 2; i <= TC.VIVO_PARTES; i++) { var x = props.getProperty('TC_VIVO_' + i); if (x === null || x === undefined) break; s += x; }
+  return s;
+}
+function tcVivoGuardar_(props, d) {
+  var o = {}, n = Math.max(1, Math.ceil(d.length / TC.VIVO_TROZO));
+  for (var i = 0; i < n; i++) o[i ? 'TC_VIVO_' + (i + 1) : 'TC_VIVO'] = d.slice(i * TC.VIVO_TROZO, (i + 1) * TC.VIVO_TROZO);
+  props.setProperties(o);
+  for (var k = n + 1; k <= TC.VIVO_PARTES; k++) props.deleteProperty('TC_VIVO_' + k);
 }
 var TC_PASOS = { zona: '7.1.1 Zona o CG', paquete: '7.1.2 Paquete de alimentos', crono: '7.1.3 Cronograma', repres: '7.1.6 Representantes',
   conv: 'Convocatoria o invitación', recep: 'Presentación de propuestas', verif: 'Verificación preliminar', doc: 'Evaluación documentaria',
@@ -375,6 +397,234 @@ function tcPaquetesTocados_(antes, despues) {
   });
   var orden = Calc.PAQUETES.filter(function (c) { return out[c]; });
   return orden.concat(Object.keys(out).filter(function (c) { return orden.indexOf(c) < 0; }).sort());
+}
+/** v2.0.46: nombres de los documentos generados (clave TIPO|PAQUETE de proc.generados). */
+var TC_DOCS = { ANEXO1: 'Anexo 1 (Zona o CG)', COT: 'Anexo 2 (cotización)', CRONO: 'Anexo 3 (cronograma)', CARTA3C: 'Anexo 3-C (cartas de invitación)',
+  ANEXO4: 'Anexo 4 (representantes)', REC13A: 'Anexo 13-A (propuestas recibidas)', REC13B: 'Anexo 13-B (propuestas no admitidas)',
+  VER13C: 'Anexo 13-C (verificación de impedimentos)', DOC14: 'Anexo 14 (evaluación documentaria)', ACTA15: 'Anexo 15 (acta de evaluación documentaria)',
+  ALM16: 'Anexo 16 (evaluación de almacén)', ACTA17: 'Anexo 17 (acta de evaluación de almacenes)', FICHA: 'Anexo 18 (evaluación de cotizaciones)',
+  ACTA: 'Anexo 19 (acta de evaluación de cotizaciones)', RESUL: 'Anexo 20 (acta de resultados)', ACTA21: 'Anexo 21 (acta de compromiso)',
+  CARTA21F: 'Anexo 21-F (carta de compromiso)' };
+/** Nombres de los datos que cambian, para el detalle de cada registro. */
+var TC_NOMBRES = {
+  linea: { dosif: 'dosificación', forma: 'presentación', unidad: 'unidad', admiteLata: 'lata', lataMin: 'lata', lataMax: 'lata', principal: 'alimento principal',
+    precision: 'precisión', tca: 'TCA', nombre: 'nombre', grupo: 'grupo', idMaestra: 'alimento de la lista', tipo: 'tipo', variedad: 'variedad', variedades: 'variedad' },
+  postor: { precios: 'precios', doc: 'evaluación documentaria', alm: 'evaluación de almacén', c1: 'criterios de la cotización', c2: 'criterios de la cotización',
+    c3: 'criterios de la cotización', d2: 'criterios de la cotización', puntaje: 'puntaje', fechaRec: 'fecha de recepción', horaRec: 'hora de recepción',
+    nombre: 'nombre', ruc: 'RUC', representante: 'representante', dniRep: 'DNI del representante', domicilio: 'domicilio', direccionAlmacen: 'dirección del almacén',
+    licenciaAF: 'licencia AF', inv: 'invitación' },
+  sa: { ninos: 'niñas y niños', direccion: 'dirección', nombre_sa: 'nombre', codigo_sa: 'código', nombre_cg: 'CG', cui_cg: 'CUI del CG', distrito: 'distrito',
+    provincia: 'provincia', departamento: 'departamento', ubigeo: 'ubigeo' },
+  crono: { inicio: 'fecha de inicio', actos: 'plazos de los actos', fechaElab: 'fecha de elaboración', orientacion: 'orientación', medio: 'medio de presentación',
+    lugar: 'lugar', horario: 'horario', almacen: 'evaluación de almacén', afColindante: 'AF colindante', motivoReprog: 'reprogramación', fechaReprog: 'reprogramación',
+    actosOriginal: 'reprogramación' },
+  anexo4: { fecha: 'fecha', hora: 'hora', lugar: 'lugar', filas: 'integrantes', autCrono: 'autorización del cronograma', autVirtual: 'reunión virtual' },
+  anexo1: { fecha: 'fecha de elaboración', zona: 'columna ZONA' },
+  invitacion: { cg: 'CG', ciudad: 'ciudad', fecha: 'fecha' },
+  porPaquete: { subsanacion: 'la subsanación de observaciones', frio: 'la cadena de frío', firma: 'los firmantes', firmaAF: 'los firmantes', firmantes: 'los firmantes',
+    etapas: 'las fechas y horas de las actas', compromiso: 'el acta de compromiso (entregas)', observaciones: 'las observaciones' }
+};
+
+/**
+ * v2.0.46: qué cambió en un guardado, para el detalle de «últimos registros»: lista de [paquete, texto] (paquete vacío = dato de
+ * toda la zona). Compara la versión anterior con la nueva: alimentos, datos y documentos de cada paquete, propuestas, invitados,
+ * evaluación, SA, cronograma, representantes y estado. Máximo 8 textos por paquete. Los nombres de personas naturales (RUC 10 o
+ * productores registrados como persona natural) no se publican.
+ */
+function tcDetalleCambios_(antes, despues) {
+  if (!antes || !despues) return [];
+  var out = [], j = function (x) { return JSON.stringify(x === undefined ? null : x); };
+  var unicos = function (xs) { var o = {}; return xs.filter(function (x) { if (o[x]) return false; o[x] = true; return true; }); };
+  var lista = function (xs, n) { xs = unicos(xs); n = n || 3; return xs.slice(0, n).join(', ') + (xs.length > n ? ' y ' + (xs.length - n) + ' más' : ''); };
+  var plural = function (n, s, p) { return n + ' ' + (n === 1 ? s : (p || s + 's')); };
+  var add = function (paq, txt) { out.push([paq || '', String(txt).replace(/\s+/g, ' ').trim().slice(0, 180)]); };
+  var fecha = function (s) { var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || '')); return m ? m[3] + '/' + m[2] + '/' + m[1] : (s ? String(s) : 'sin fecha'); };
+  var camposDistintos = function (a, d, nombres, excluir) {
+    var o = {}; Object.keys(a || {}).concat(Object.keys(d || {})).forEach(function (k) {
+      if ((excluir || []).indexOf(k) >= 0 || j((a || {})[k]) === j((d || {})[k])) return;
+      o[nombres[k] || 'otros datos'] = true;
+    });
+    return Object.keys(o);
+  };
+  var grupos = {}, validos = {};
+  Calc.PAQUETES.forEach(function (c) { validos[c] = true; });
+  [antes, despues].forEach(function (p) {
+    (p.paquetes || []).forEach(function (x) { if (x && x.codigo) validos[x.codigo] = true; });
+    try { Calc.gruposEvaluacion(p).forEach(function (g) { grupos[g.clave] = g.paquetes || []; }); } catch (e) { }
+  });
+  // una clave por paquete (NP), por grupo de evaluación (EXC → sus paquetes) o de toda la zona (TODOS u otra)
+  var paqsDe = function (k) {
+    var ps = []; String(k || '').split('|').forEach(function (x) { if (grupos[x] && grupos[x].length) ps = ps.concat(grupos[x]); else if (validos[x]) ps.push(x); });
+    return ps.length ? unicos(ps) : [''];
+  };
+  var natural = function (x) { return !!x && (x.persona === true || /^10\d{9}$/.test(String(x.ruc || x.doc || '').trim())); };
+  var nomPostor = function (x) { return natural(x) ? 'postor ' + (x.n || '') + ' (persona natural)' : (String(x.nombre || '').trim() || 'postor ' + (x.n || '')); };
+  var nomInv = function (x) { return natural(x) ? 'un productor (persona natural)' : (String(x.empresa || x.nombre || '').trim().slice(0, 60) || 'un invitado'); };
+
+  // ------------------------------------------------------------------ alimentos (por paquete)
+  var la = {}, ld = {};
+  (antes.lineas || []).forEach(function (l) { la[l.id] = l; });
+  (despues.lineas || []).forEach(function (l) { ld[l.id] = l; });
+  var bol = {}, b = function (c) { return bol[c] = bol[c] || { mas: [], menos: [], mod: [], entra: {}, sale: {} }; };
+  Object.keys(ld).forEach(function (id) {
+    var d = ld[id], a = la[id];
+    if (!a) { b(d.paquete).mas.push(d.nombre); return; }
+    if (a.paquete !== d.paquete) {
+      (b(d.paquete).entra[a.paquete] = b(d.paquete).entra[a.paquete] || []).push(d.nombre);
+      (b(a.paquete).sale[d.paquete] = b(a.paquete).sale[d.paquete] || []).push(d.nombre);
+      return;
+    }
+    if (j(a) === j(d)) return;
+    b(d.paquete).mod.push(d.nombre + ' (' + camposDistintos(a, d, TC_NOMBRES.linea, ['paquete', 'orden']).join(', ') + ')');
+  });
+  Object.keys(la).forEach(function (id) { if (!ld[id]) b(la[id].paquete).menos.push(la[id].nombre); });
+  Object.keys(bol).forEach(function (c) {
+    var x = bol[c];
+    if (x.mas.length) add(c, 'Agregó ' + plural(unicos(x.mas).length, 'alimento') + ': ' + lista(x.mas));
+    if (x.menos.length) add(c, 'Quitó ' + plural(unicos(x.menos).length, 'alimento') + ': ' + lista(x.menos));
+    Object.keys(x.entra).forEach(function (o) { add(c, 'Pasaron desde ' + o + ': ' + lista(x.entra[o])); });
+    Object.keys(x.sale).forEach(function (o) { add(c, 'Pasaron a ' + o + ': ' + lista(x.sale[o])); });
+    if (x.mod.length) add(c, 'Modificó ' + plural(x.mod.length, 'alimento') + ': ' + lista(x.mod, 2));
+  });
+
+  // ------------------------------------------------------------------ datos del paquete y paquetes marcados en 7.1.1
+  var dp = function (p) { var o = {}; (p.paquetes || []).forEach(function (x) { if (x && x.codigo) o[x.codigo] = x; }); return o; };
+  var pa = dp(antes), pd = dp(despues);
+  Object.keys(pd).forEach(function (c) {
+    var a = pa[c] || {}, d = pd[c];
+    if (j(a.dias) !== j(d.dias)) add(c, 'Días de pedido: ' + (a.dias === undefined || a.dias === '' ? 'sin dato' : a.dias) + ' → ' + (d.dias === '' ? 'sin dato' : d.dias));
+    if (j(a.frecuencia) !== j(d.frecuencia)) add(c, 'Frecuencia de pedido: ' + (a.frecuencia || 'sin dato') + ' → ' + (d.frecuencia || 'sin dato'));
+    if (j(a.nombre || '') !== j(d.nombre || '')) add(c, 'Nombre del paquete: ' + (d.nombre ? '“' + d.nombre + '”' : 'sin nombre'));
+  });
+  var pv = function (p) { return p.paquetesPrevistos || []; };
+  pv(despues).forEach(function (c) { if (pv(antes).indexOf(c) < 0) add(c, 'Marcó el paquete en 7.1.1'); });
+  pv(antes).forEach(function (c) { if (pv(despues).indexOf(c) < 0) add(c, 'Desmarcó el paquete en 7.1.1'); });
+
+  // ------------------------------------------------------------------ documentos generados
+  var ga = antes.generados || {}, gd = despues.generados || {};
+  Object.keys(gd).forEach(function (k) {
+    if (j(ga[k]) === j(gd[k])) return;
+    var t = k.split('|'), nom = TC_DOCS[t[0]] || t[0];
+    paqsDe(t.slice(1).join('|')).forEach(function (q) { add(q, (ga[k] ? 'Volvió a generar el ' : 'Generó el ') + nom); });
+  });
+  Object.keys(ga).forEach(function (k) {
+    if (gd[k] !== undefined) return;
+    var t = k.split('|');
+    paqsDe(t.slice(1).join('|')).forEach(function (q) { add(q, 'Quitó el registro del ' + (TC_DOCS[t[0]] || t[0])); });
+  });
+
+  // ------------------------------------------------------------------ propuestas (por paquete o grupo de evaluación)
+  var poA = antes.postores || {}, poD = despues.postores || {};
+  unicos(Object.keys(poA).concat(Object.keys(poD))).forEach(function (k) {
+    var A = poA[k] || [], D = poD[k] || [];
+    if (j(A) === j(D)) return;
+    var porN = function (xs) { var o = {}; (xs || []).forEach(function (x, i) { if (x) o[String(x.n || i + 1)] = x; }); return o; };
+    var oa = porN(A), od = porN(D), msgs = [];
+    Object.keys(od).forEach(function (n) {
+      var a = oa[n], d = od[n];
+      if (!a) { msgs.push('Registró la propuesta de ' + nomPostor(d)); return; }
+      if (j(a) === j(d)) return;
+      msgs.push('Propuesta de ' + nomPostor(d) + ': ' + camposDistintos(a, d, TC_NOMBRES.postor, ['n']).join(', '));
+    });
+    Object.keys(oa).forEach(function (n) { if (!od[n]) msgs.push('Quitó la propuesta de ' + nomPostor(oa[n])); });
+    paqsDe(k).forEach(function (q) { msgs.forEach(function (m) { add(q, m); }); });
+  });
+
+  // ------------------------------------------------------------------ evaluación y actas guardadas por paquete
+  var vistos = {};
+  Object.keys(TC_NOMBRES.porPaquete).forEach(function (campo) {
+    var a = antes[campo], d = despues[campo];
+    if ((a && (typeof a !== 'object' || Array.isArray(a))) || (d && (typeof d !== 'object' || Array.isArray(d)))) return;
+    a = a || {}; d = d || {};
+    unicos(Object.keys(a).concat(Object.keys(d))).forEach(function (k) {
+      if (j(a[k]) === j(d[k])) return;
+      paqsDe(k).forEach(function (q) {
+        var t = 'Actualizó ' + TC_NOMBRES.porPaquete[campo];
+        if (vistos[q + t]) return; vistos[q + t] = true; add(q, t);
+      });
+    });
+  });
+
+  // ------------------------------------------------------------------ invitados (agricultura familiar)
+  var inv = function (p) { var o = {}; (p.invitados || []).forEach(function (x, i) { o[String(x.cod || x.doc || x.ruc || x.empresa || i)] = x; }); return o; };
+  var ia = inv(antes), id = inv(despues), conAli = Object.keys((function () { var o = {}; (despues.lineas || []).forEach(function (l) { o[l.paquete] = 1; }); return o; })());
+  var pqI = function (x) { return x ? (x.paquetes || conAli) : []; };
+  var bi = {}, bI = function (c) { return bi[c] = bi[c] || { mas: [], menos: [], si: [], no: [], carta: [], mod: [] }; };
+  unicos(Object.keys(ia).concat(Object.keys(id))).forEach(function (k) {
+    var a = ia[k], d = id[k];
+    if (j(a) === j(d)) return;
+    if (!a) { pqI(d).forEach(function (c) { bI(c).mas.push(nomInv(d)); }); return; }
+    if (!d) { pqI(a).forEach(function (c) { bI(c).menos.push(nomInv(a)); }); return; }
+    var pA = pqI(a), pD = pqI(d), nom = nomInv(d);
+    pD.forEach(function (c) { if (pA.indexOf(c) < 0) bI(c).mas.push(nom); });
+    pA.forEach(function (c) { if (pD.indexOf(c) < 0) bI(c).menos.push(nom); });
+    if (!!a.invitar !== !!d.invitar) pD.forEach(function (c) { bI(c)[d.invitar ? 'si' : 'no'].push(nom); });
+    var na = a.numeros || {}, nd = d.numeros || {};
+    unicos(Object.keys(na).concat(Object.keys(nd))).forEach(function (c) {
+      if (j(na[c]) === j(nd[c])) return;
+      bI(c).carta.push(nom + (nd[c] ? ' (N° ' + String(nd[c]).split('-')[0] + ')' : ' (sin N°)'));
+    });
+    if (camposDistintos(a, d, {}, ['paquetes', 'numeros', 'invitar']).length) pD.forEach(function (c) { bI(c).mod.push(nom); });
+  });
+  Object.keys(bi).forEach(function (c) {
+    var x = bi[c];
+    if (x.mas.length) add(c, 'Agregó ' + plural(x.mas.length, 'invitado') + ': ' + lista(x.mas));
+    if (x.menos.length) add(c, 'Quitó ' + plural(x.menos.length, 'invitado') + ': ' + lista(x.menos));
+    if (x.si.length) add(c, 'Marcó para invitar: ' + lista(x.si));
+    if (x.no.length) add(c, 'Desmarcó la invitación de: ' + lista(x.no));
+    if (x.carta.length) add(c, 'N° de carta: ' + lista(x.carta));
+    if (x.mod.length) add(c, 'Actualizó datos de ' + plural(x.mod.length, 'invitado') + ': ' + lista(x.mod));
+  });
+
+  // ------------------------------------------------------------------ toda la zona (primero el estado y los datos de la zona)
+  if (String(antes.estado || '') !== String(despues.estado || '')) add('', 'Estado: ' + (antes.estado || 'sin estado') + ' → ' + (despues.estado || 'sin estado'));
+  if (String(antes.zona || '') !== String(despues.zona || '')) add('', 'Nombre de la zona: ' + antes.zona + ' → ' + despues.zona);
+  if (String(antes.convocatoria || '') !== String(despues.convocatoria || '')) add('', 'Convocatoria: ' + antes.convocatoria + ' → ' + despues.convocatoria);
+  if (String(antes.fechaEval || '') !== String(despues.fechaEval || '')) add('', 'Fecha de evaluación: ' + fecha(antes.fechaEval) + ' → ' + fecha(despues.fechaEval));
+  if (!!antes.liberaCG !== !!despues.liberaCG) add('', despues.liberaCG ? 'Marcó la zona como zona por paquete' : 'Quitó la marca de zona por paquete');
+  var sa = function (p) { var o = {}; (p.sa || []).forEach(function (x) { o[x.id] = x; }); return o; };
+  var sA = sa(antes), sD = sa(despues), cg = function (x) { return String(x.nombre_cg || x.cui_cg || '').trim(); };
+  var masS = Object.keys(sD).filter(function (k) { return !sA[k]; }), menosS = Object.keys(sA).filter(function (k) { return !sD[k]; });
+  var modS = Object.keys(sD).filter(function (k) { return sA[k] && j(sA[k]) !== j(sD[k]); });
+  if (masS.length) add('', 'Agregó ' + plural(masS.length, 'SA', 'SA') + ' (CG ' + lista(masS.map(function (k) { return cg(sD[k]); })) + ')');
+  if (menosS.length) add('', 'Quitó ' + plural(menosS.length, 'SA', 'SA') + ' (CG ' + lista(menosS.map(function (k) { return cg(sA[k]); })) + ')');
+  if (modS.length) {
+    var cs = []; modS.forEach(function (k) { cs = cs.concat(camposDistintos(sA[k], sD[k], TC_NOMBRES.sa)); });
+    add('', 'Actualizó ' + plural(modS.length, 'SA', 'SA') + ': ' + lista(cs, 4));
+  }
+  var exA = {}; (antes.saExcluidos || []).forEach(function (x) { exA[x.id] = x; });
+  (despues.saExcluidos || []).forEach(function (x) { if (!exA[x.id] || exA[x.id].motivo !== x.motivo) add('', 'Quitó del Anexo 1 el SA ' + (x.codigo_sa || x.nombre_sa || x.id) + ': ' + (x.motivo || 'sin motivo')); });
+  var ca = antes.crono || {}, cd = despues.crono || {};
+  if (j(ca) !== j(cd)) {
+    if (!ca.inicio && cd.inicio) add('', 'Registró el cronograma (inicio: ' + fecha(cd.inicio) + ')');
+    else {
+      if (ca.inicio !== cd.inicio) add('', 'Inicio del cronograma: ' + fecha(ca.inicio) + ' → ' + fecha(cd.inicio));
+      var otrosC = camposDistintos(ca, cd, TC_NOMBRES.crono, ['inicio']);
+      if (otrosC.length) add('', 'Cronograma: ' + lista(otrosC, 4));
+    }
+  }
+  [['anexo4', 'Anexo 4 (representantes)'], ['anexo1', 'Anexo 1'], ['invitacion', 'Datos de la invitación']].forEach(function (x) {
+    var cs = camposDistintos(antes[x[0]], despues[x[0]], TC_NOMBRES[x[0]]);
+    if (cs.length) add('', x[1] + ': ' + lista(cs, 4));
+  });
+  if (j(antes.cgDatos) !== j(despues.cgDatos)) add('', 'Actualizó los datos de los CG');
+  if (j(antes.perecPorGrupos) !== j(despues.perecPorGrupos) || j(antes.gruposPaq) !== j(despues.gruposPaq)) add('', 'Cambió la agrupación de los perecibles');
+  // lo que no se nombra arriba (sin los datos que cambian solos en cada guardado)
+  var conocidos = ['lineas', 'paquetes', 'paquetesPrevistos', 'generados', 'nombresGen', 'postores', 'invitados', 'sa', 'saExcluidos', 'crono', 'anexo4', 'anexo1',
+    'invitacion', 'estado', 'zona', 'convocatoria', 'fechaEval', 'liberaCG', 'cgDatos', 'perecPorGrupos', 'gruposPaq', 'id', 'ut', 'utNombre', 'anio', 'modalidad',
+    'version', 'actualizado', 'creado', 'propietario', 'propietarioNombre', 'estadoAuto', 'estadoMotivo', 'estadoPor', 'seq', 'provincias', 'distritos',
+    'tipoConfirmado', 'prueba', 'renombreVersion', 'zonaAnterior', 'origen', 'cgClave'].concat(Object.keys(TC_NOMBRES.porPaquete));
+  var otros = unicos(Object.keys(antes).concat(Object.keys(despues))).filter(function (k) { return conocidos.indexOf(k) < 0 && k.charAt(0) !== '_' && j(antes[k]) !== j(despues[k]); });
+  if (otros.length) add('', 'Otros datos: ' + lista(otros, 4));
+
+  // máximo 8 textos por paquete (el resto se cuenta)
+  var porQ = {}, res = [];
+  out.forEach(function (x) { (porQ[x[0]] = porQ[x[0]] || []).push(x); });
+  Object.keys(porQ).forEach(function (q) {
+    var xs = porQ[q];
+    res = res.concat(xs.length > 8 ? xs.slice(0, 7).concat([[q, 'y ' + (xs.length - 7) + ' cambios más']]) : xs);
+  });
+  return res;
 }
 function tcTextoAvance_(doc) {
   if (/Adjudicado|Desierto|Cancelado/.test(doc.est)) return 'Actualizó el proceso (' + doc.est.toLowerCase() + ')';
