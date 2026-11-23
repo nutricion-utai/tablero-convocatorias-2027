@@ -183,6 +183,24 @@
    * varios paquetes aparece en cada uno. procDe(id) da el proceso publicado, para el nombre y el orden de sus paquetes.
    * Las UT/OCT y las zonas van de la más reciente a la más antigua; los paquetes en su orden (NP, P1, P2…) y al final toda la zona.
    */
+  /** Paso de un registro: «Actualizó: 7.1.2 Paquete de alimentos · 6 de 12 pasos» → { k: 'Actualizó: 7.1.2 Paquete de alimentos', n: 6 }. */
+  function pasoDeRegistro(v) {
+    var a = String(v.a || ''), m = / · (\d+) de 12 pasos$/.exec(a);
+    return { k: m ? a.slice(0, m.index) : a, n: m ? Number(m[1]) : null };
+  }
+  /** Registros de un paquete agrupados por paso (una fila por paso, la más reciente primero), con sus usuarios y el último avance. */
+  function agruparPasos(regs, reciente) {
+    var out = [], porK = {};
+    (regs || []).forEach(function (v) {
+      var s = pasoDeRegistro(v), g = porK[s.k];
+      if (!g) { g = porK[s.k] = { k: s.k, t: v.t, t0: v.t, n: s.n, usuarios: [], regs: [] }; out.push(g); }
+      g.regs.push(v);
+      if (v.t > g.t) { g.t = v.t; g.n = s.n; }
+      if (v.t < g.t0) g.t0 = v.t;
+      if (v.u && g.usuarios.indexOf(v.u) < 0) g.usuarios.push(v.u);
+    });
+    return out.sort(reciente);
+  }
   function agruparVivo(vivo, procDe) {
     var uts = [], porUT = {};
     (vivo || []).forEach(function (v) {
@@ -205,7 +223,7 @@
         var orden = paqs.map(function (q) { return q.c; }).concat(PAQ_ORDEN);
         var rango = function (k) { if (k === '') return 1e6; if (k === '?') return 1e6 + 1; var i = orden.indexOf(k); return i < 0 ? 1e5 : i; };
         z.paquetes = Object.keys(z.grupos).sort(function (a, b) { return rango(a) - rango(b) || (a < b ? -1 : a > b ? 1 : 0); }).map(function (k) {
-          return { c: k, n: k === '' ? 'Toda la zona' : k === '?' ? 'Sin detalle de paquete' : (nombre[k] || ''), regs: z.grupos[k] };
+          return { c: k, n: k === '' ? 'Toda la zona' : k === '?' ? 'Sin detalle de paquete' : (nombre[k] || ''), regs: z.grupos[k], pasos: agruparPasos(z.grupos[k], reciente) };
         });
         delete z.grupos;
       });
@@ -219,7 +237,7 @@
     etapas: etapas, nombrePaso: nombrePaso, actos: actos, esAF: esAF,
     hoyLima: hoyLima, horaLima: horaLima, fecha: fecha, fechaCorta: fechaCorta, fechaHora: fechaHora, sumarDias: sumarDias, diasEntre: diasEntre, diaUTC: diaUTC, haceCuanto: haceCuanto,
     estadoHoy: estadoHoy, enCurso: enCurso, actoHoy: actoHoy, alertasAF: alertasAF, agenda: agenda,
-    mediana: mediana, preciosPorAlimento: preciosPorAlimento, agruparVivo: agruparVivo,
+    mediana: mediana, preciosPorAlimento: preciosPorAlimento, agruparVivo: agruparVivo, pasoDeRegistro: pasoDeRegistro,
     num: num, soles: soles, pct: pct, esc: esc, norm: norm
   };
   if (typeof module === 'object' && module.exports) module.exports = L;

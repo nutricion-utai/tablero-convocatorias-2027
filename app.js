@@ -15,7 +15,7 @@
     preciosPedidos: false, preciosListos: false, listo: false,
     f: { ut: '', sect: '', mod: '', est: '', q: '', paso: '', acto: '' },
     vista: 'res', orden: 'ut', diasAg: 14, abierto: null, abiertoPre: {}, recientes: new Map(), ultimoAviso: '', qPre: '',
-    actCerradas: new Set()
+    actCerradas: new Set(), actAbiertos: new Set()
   };
   var H = {};      // acciones que entrega boot.mjs: pedirPrecios(), salir()
   var VISTAS = { res: ['#vRes', 'resumen'], pro: ['#vPro', 'procesos'], cro: ['#vCro', 'cronograma'], pre: ['#vPre', 'resultados'], act: ['#vAct', 'actividad'] };
@@ -367,10 +367,32 @@
   }
 
   // ==================================================================== ACTIVIDAD
-  /** Últimos registros por UT/OCT y, dentro, por zona y paquete (lo que cambió cada guardado). Se recuerda qué UT/OCT se plegó. */
+  /** Hora de un registro: «13:40» si es de hoy; si no, «21/11 13:40». */
+  function horaRegistro(t) { var s = String(t || ''); return s.slice(0, 10) === L.hoyLima() ? s.slice(11, 16) : L.fechaCorta(s) + ' ' + s.slice(11, 16); }
+  /** Lo que cambió un registro en un paquete (c) o en toda la zona (c = ''); los registros anteriores a la versión 2.0.46 no lo traen. */
+  function detalleRegistro(v, c) {
+    if (/^(Registró|Eliminó) el proceso/.test(v.a || '')) return '<span class="muted">' + esc(v.a) + '</span>';
+    if (!Array.isArray(v.d) || c === '?') return '<span class="muted">Sin detalle del cambio (registro anterior a esta función)</span>';
+    var xs = v.d.filter(function (x) { return x && x[0] === c; });
+    if (xs.length) return '<ul class="cambios">' + xs.map(function (x) { return '<li>' + esc(x[1]) + '</li>'; }).join('') + '</ul>';
+    return '<span class="muted">' + (c ? 'Cambió otros datos de este paquete' : v.d.length ? 'Sin cambios de la zona' : 'Guardó sin cambios en los datos') + '</span>';
+  }
+  /** Una fila por paso del registro (p. ej. «7.1.2 Paquete de alimentos»), que se despliega con cada guardado y lo que cambió. */
+  function filaPaso(z, q, g) {
+    var clave = z.id + '|' + q.c + '|' + g.k, varios = g.regs.length > 1, etq = g.k.replace(/^Actualizó: /, '');
+    return '<details class="act-g" data-actg="' + esc(clave) + '"' + (S.actAbiertos.has(clave) ? ' open' : '') + '><summary>' +
+      '<span class="hora" title="' + esc(varios ? 'Del ' + L.fechaHora(g.t0) + ' al ' + L.fechaHora(g.t) : L.fechaHora(g.t)) + '">' + esc(L.haceCuanto(g.t)) + '</span>' +
+      '<span class="act-gt"><b>' + esc(etq) + '</b>' + (g.n !== null ? ' <span class="muted">· ' + g.n + ' de 12 pasos</span>' : '') +
+      (varios ? ' <span class="cnt">' + g.regs.length + ' registros</span>' : '') + (g.usuarios.length ? ' <span class="muted">· ' + esc(g.usuarios.join(', ')) + '</span>' : '') + '</span></summary>' +
+      '<ul class="act-det">' + g.regs.map(function (v) {
+        return '<li><span class="hora" title="' + esc(L.fechaHora(v.t)) + '">' + esc(horaRegistro(v.t)) + '</span><div>' +
+          (g.usuarios.length > 1 && v.u ? '<div class="muted">' + esc(v.u) + '</div>' : '') + detalleRegistro(v, q.c) + '</div></li>';
+      }).join('') + '</ul></details>';
+  }
+  /** Últimos registros por UT/OCT y, dentro, por zona, paquete y paso (lo que cambió cada guardado). Se recuerda qué se plegó o desplegó. */
   function vistaActividad() {
     var e = S.estado;
-    var h = '<div class="card"><div class="cab"><h2>Últimos registros en la herramienta</h2><span class="nota">Por UT/OCT, zona y paquete. Cada vez que una especialista guarda un proceso, aparece aquí, en los paquetes que cambió, y el tablero se actualiza.' +
+    var h = '<div class="card"><div class="cab"><h2>Últimos registros en la herramienta</h2><span class="nota">Por UT/OCT, zona, paquete y paso: haga clic en una fila para ver cada guardado y lo que cambió. Cada vez que una especialista guarda un proceso, aparece aquí y el tablero se actualiza.' +
       (e && e.sinc ? ' Revisión completa de todos los procesos: ' + esc(L.fechaHora(e.sinc)) + '.' : '') + '</span></div>';
     if (!S.vivo.length) return h + vacio('Todavía no hay registros desde que se activó el tablero.') + '</div>';
     var hoy = L.hoyLima(), uts = L.agruparVivo(S.vivo, function (id) { return S.P.get(id); });
@@ -383,10 +405,8 @@
             ' <span class="muted">' + esc(String(z.c || '').toLowerCase()) + '</span>' + (p ? ' ' + badgeEst(L.estadoHoy(p, hoy)) : ' <span class="muted">· ya no está en el tablero</span>') + '</div>' +
             z.paquetes.map(function (q) {
               var paq = q.c && q.c !== '?';
-              return '<div class="act-paq' + (paq ? '' : ' gen') + '"><div class="act-pt">' + (paq ? '<span class="pq">' + esc(q.c) + '</span> ' + esc(q.n) : esc(q.n)) + '</div><ul class="feed">' +
-                q.regs.map(function (v) {
-                  return '<li><span class="hora" title="' + esc(L.fechaHora(v.t)) + '">' + esc(L.haceCuanto(v.t)) + '</span><div>' + esc(v.a) + (v.u ? ' <span class="muted">· ' + esc(v.u) + '</span>' : '') + '</div></li>';
-                }).join('') + '</ul></div>';
+              return '<div class="act-paq' + (paq ? '' : ' gen') + '"><div class="act-pt">' + (paq ? '<span class="pq">' + esc(q.c) + '</span> ' + esc(q.n) : esc(q.n)) + '</div>' +
+                q.pasos.map(function (g) { return filaPaso(z, q, g); }).join('') + '</div>';
             }).join('') + '</div>';
         }).join('') + '</details>';
     }).join('') + '</div>';
@@ -520,7 +540,11 @@
     $('#btnSalir').onclick = function () { if (H.salir) H.salir(); };
     // delegación de clics
     // últimos registros: se recuerda qué UT/OCT plegó el usuario (el evento toggle no burbujea: se escucha en captura)
-    document.addEventListener('toggle', function (ev) { var d = ev.target; if (d && d.matches && d.matches('details[data-actut]')) { if (d.open) S.actCerradas.delete(d.getAttribute('data-actut')); else S.actCerradas.add(d.getAttribute('data-actut')); } }, true);
+    document.addEventListener('toggle', function (ev) {
+      var d = ev.target; if (!d || !d.matches) return;
+      if (d.matches('details[data-actut]')) { if (d.open) S.actCerradas.delete(d.getAttribute('data-actut')); else S.actCerradas.add(d.getAttribute('data-actut')); }
+      if (d.matches('details[data-actg]')) { if (d.open) S.actAbiertos.add(d.getAttribute('data-actg')); else S.actAbiertos.delete(d.getAttribute('data-actg')); }
+    }, true);
     document.addEventListener('click', function (ev) {
       var t = ev.target.closest('[data-abrir],[data-est],[data-paso],[data-acto],[data-ut],[data-quitar],[data-ali],#csv,.cerrar,#modal');
       if (!t) return;
