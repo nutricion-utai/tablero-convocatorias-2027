@@ -176,12 +176,50 @@
   function esc(s) { return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function norm(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
 
+  var PAQ_ORDEN = ['NP', 'P1', 'P2', 'P3', 'EXC'];
+  /**
+   * Últimos registros agrupados por UT/OCT y, dentro, por zona (proceso) y paquete. Cada registro trae p: los paquetes que cambió
+   * ese guardado (vacío: datos de toda la zona; sin p: registro anterior a esa versión de la herramienta). Un registro que cambió
+   * varios paquetes aparece en cada uno. procDe(id) da el proceso publicado, para el nombre y el orden de sus paquetes.
+   * Las UT/OCT y las zonas van de la más reciente a la más antigua; los paquetes en su orden (NP, P1, P2…) y al final toda la zona.
+   */
+  function agruparVivo(vivo, procDe) {
+    var uts = [], porUT = {};
+    (vivo || []).forEach(function (v) {
+      var ku = String(v.ut || ''), u = porUT[ku];
+      if (!u) { u = porUT[ku] = { ut: ku, t: v.t, n: 0, zonas: [], porZona: {} }; uts.push(u); }
+      u.n++; if (v.t > u.t) u.t = v.t;
+      var kz = String(v.id || v.z || ''), z = u.porZona[kz];
+      if (!z) { z = u.porZona[kz] = { id: v.id, z: v.z, m: v.m, c: v.c, t: v.t, n: 0, grupos: {} }; u.zonas.push(z); }
+      z.n++; if (v.t > z.t) z.t = v.t;
+      var ps = !Array.isArray(v.p) ? ['?'] : v.p.length ? v.p : [''];
+      ps.forEach(function (c) { (z.grupos[c] = z.grupos[c] || []).push(v); });
+    });
+    var reciente = function (a, b) { return a.t < b.t ? 1 : a.t > b.t ? -1 : 0; };
+    uts.sort(reciente);
+    uts.forEach(function (u) {
+      u.zonas.sort(reciente);
+      u.zonas.forEach(function (z) {
+        var proc = procDe ? procDe(z.id) : null, paqs = (proc && proc.paqs) || [], nombre = {};
+        paqs.forEach(function (q) { nombre[q.c] = q.n; });
+        var orden = paqs.map(function (q) { return q.c; }).concat(PAQ_ORDEN);
+        var rango = function (k) { if (k === '') return 1e6; if (k === '?') return 1e6 + 1; var i = orden.indexOf(k); return i < 0 ? 1e5 : i; };
+        z.paquetes = Object.keys(z.grupos).sort(function (a, b) { return rango(a) - rango(b) || (a < b ? -1 : a > b ? 1 : 0); }).map(function (k) {
+          return { c: k, n: k === '' ? 'Toda la zona' : k === '?' ? 'Sin detalle de paquete' : (nombre[k] || ''), regs: z.grupos[k] };
+        });
+        delete z.grupos;
+      });
+      delete u.porZona;
+    });
+    return uts;
+  }
+
   var L = {
     MODALIDAD: MODALIDAD, MOD_CORTA: MOD_CORTA, ACTOS_CP: ACTOS_CP, ACTOS_AF: ACTOS_AF, PASOS: PASOS, PASO_CORTO: PASO_CORTO, ESTADOS: ESTADOS, FINALES: FINALES,
     etapas: etapas, nombrePaso: nombrePaso, actos: actos, esAF: esAF,
     hoyLima: hoyLima, horaLima: horaLima, fecha: fecha, fechaCorta: fechaCorta, fechaHora: fechaHora, sumarDias: sumarDias, diasEntre: diasEntre, diaUTC: diaUTC, haceCuanto: haceCuanto,
     estadoHoy: estadoHoy, enCurso: enCurso, actoHoy: actoHoy, alertasAF: alertasAF, agenda: agenda,
-    mediana: mediana, preciosPorAlimento: preciosPorAlimento,
+    mediana: mediana, preciosPorAlimento: preciosPorAlimento, agruparVivo: agruparVivo,
     num: num, soles: soles, pct: pct, esc: esc, norm: norm
   };
   if (typeof module === 'object' && module.exports) module.exports = L;

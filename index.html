@@ -216,6 +216,21 @@ table.tb{width:100%;border-collapse:collapse;font-size:14.5px}
 .feed{list-style:none;margin:0;padding:0}
 .feed li{display:grid;grid-template-columns:150px 1fr;gap:12px;padding:9px 0;border-bottom:1px solid var(--grid);font-size:14.5px}
 .feed .hora{color:var(--muted);font-size:13.5px}
+.sin-cro{list-style:none;margin:10px 0 0;padding:0;columns:2 340px;column-gap:24px}
+.sin-cro li{padding:4px 0;break-inside:avoid;font-size:14.5px}
+.sin-cro-d{margin-top:12px}
+.sin-cro-d>summary{cursor:pointer;color:var(--azul);font-size:14px}
+.act-ut{border-top:1px solid var(--rule)}
+.act-ut:first-of-type{border-top:0}
+.act-ut>summary{cursor:pointer;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;padding:12px 0 8px;font-size:14px}
+.act-utn{font-family:var(--f-display);font-weight:700;font-size:17px;color:var(--ink)}
+.act-zona{margin:2px 0 14px 6px;padding-left:14px;border-left:3px solid var(--grid)}
+.act-zc{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:15px;font-weight:600}
+.act-paq{margin:8px 0 0 4px}
+.act-pt{font-size:13.5px;color:var(--ink2);font-weight:600}
+.act-pt .pq{display:inline-block;min-width:30px;text-align:center;border-radius:5px;background:var(--azul-soft);color:var(--azul);font-weight:700;padding:0 6px;margin-right:2px}
+.act-paq.gen .act-pt{color:var(--muted);font-weight:400;font-style:italic}
+.act-paq .feed li{grid-template-columns:130px 1fr;padding:6px 0;font-size:14px}
 
 /* detalle */
 #modal{position:fixed;inset:0;z-index:50;background:rgba(9,22,36,.55);display:flex;justify-content:flex-end}
@@ -291,7 +306,8 @@ table.tb{width:100%;border-collapse:collapse;font-size:14.5px}
   .kpi b{font-size:24px}
   .hb{grid-template-columns:minmax(110px,44%) 1fr 54px}
   #vPre .hb{grid-template-columns:minmax(110px,36%) 1fr 96px}
-  .feed li{grid-template-columns:1fr;gap:2px}
+  .feed li,.act-paq .feed li{grid-template-columns:1fr;gap:2px}
+  .act-zona{margin-left:0;padding-left:10px}
   #modal .caja{padding:18px 14px 26px}
 }
 @media print{.bar,.tabs,#toast,.btn,.btn-sal{display:none}.card{break-inside:avoid}}

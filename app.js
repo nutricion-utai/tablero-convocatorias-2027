@@ -13,8 +13,9 @@
   var S = {
     meta: null, P: new Map(), PR: new Map(), vivo: [], estado: null,
     preciosPedidos: false, preciosListos: false, listo: false,
-    f: { ut: '', sect: '', mod: '', est: '', q: '', paso: '' },
-    vista: 'res', orden: 'ut', diasAg: 14, abierto: null, abiertoPre: {}, recientes: new Map(), ultimoAviso: '', qPre: ''
+    f: { ut: '', sect: '', mod: '', est: '', q: '', paso: '', acto: '' },
+    vista: 'res', orden: 'ut', diasAg: 14, abierto: null, abiertoPre: {}, recientes: new Map(), ultimoAviso: '', qPre: '',
+    actCerradas: new Set()
   };
   var H = {};      // acciones que entrega boot.mjs: pedirPrecios(), salir()
   var VISTAS = { res: ['#vRes', 'resumen'], pro: ['#vPro', 'procesos'], cro: ['#vCro', 'cronograma'], pre: ['#vPre', 'resultados'], act: ['#vAct', 'actividad'] };
@@ -54,6 +55,16 @@
     arr.alertas = al;
     return arr;
   }
+  /** Acto del cronograma de hoy de un proceso en curso, como en el gráfico del resumen (null si ya tiene resultado o está cancelado). */
+  var ACTO_TXT = { _antes: 'Entre actos o por iniciar', _fin: 'Cronograma concluido', _sin: 'Sin cronograma registrado' };
+  function actoClave(p) {
+    if (L.FINALES.test(p.e)) return null;
+    var a = p.acto || {};
+    if (a.tipo === 'curso') return a.i === 0 && p.mod === 'AF' ? 'Invitación directa' : a.nombre;
+    return a.tipo === 'sin' ? '_sin' : a.tipo === 'fin' ? '_fin' : '_antes';
+  }
+  function actoTxt(k) { return ACTO_TXT[k] || k; }
+  /** sinPaso: sin los filtros que se eligen en los gráficos del resumen (paso del registro y acto de hoy). */
   function filtrar(arr, sinEstado, sinPaso) {
     var f = S.f, q = L.norm(f.q);
     return arr.filter(function (p) {
@@ -65,6 +76,7 @@
         if (f.est === 'curso' ? !L.enCurso(p.e) : f.est === 'alerta' ? !p.alerta : f.est === 'alta' ? p.alerta !== 'alta' : p.e !== f.est) return false;
       }
       if (!sinPaso && f.paso && (p.paso !== f.paso || L.FINALES.test(p.e))) return false;
+      if (!sinPaso && f.acto && actoClave(p) !== f.acto) return false;
       return true;
     });
   }
@@ -110,6 +122,7 @@
     if (f.mod) t.push(f.mod === 'CP' ? 'convocatorias públicas' : (L.MODALIDAD[f.mod] || f.mod).toLowerCase());
     if (f.est) t.push(NOMBRE_EST[f.est] || f.est.toLowerCase());
     if (f.paso) t.push('paso ' + L.PASO_CORTO[f.paso]);
+    if (f.acto) t.push('acto de hoy: ' + actoTxt(f.acto).toLowerCase());
     if (f.q) t.push('búsqueda “' + f.q + '”');
     return t.length ? t.join(' · ') : 'todas las UT/OCT';
   }
@@ -147,21 +160,21 @@
     }).join('');
     var nombres = {}, cnt = { antes: 0, sin: 0, fin: 0 };
     conPaso.forEach(function (p) {
-      if (L.FINALES.test(p.e)) return;
-      var a = p.acto;
-      if (a.tipo === 'curso') { var k = a.i === 0 && p.mod === 'AF' ? 'Invitación directa' : a.nombre; nombres[k] = (nombres[k] || 0) + 1; }
-      else if (a.tipo === 'sin') cnt.sin++; else if (a.tipo === 'fin') cnt.fin++; else cnt.antes++;
+      var k = actoClave(p); if (k === null) return;
+      if (k === '_sin') cnt.sin++; else if (k === '_fin') cnt.fin++; else if (k === '_antes') cnt.antes++; else nombres[k] = (nombres[k] || 0) + 1;
     });
     var ordenActos = ['Invitación directa'].concat(L.ACTOS_CP);
     var filasActo = ordenActos.map(function (n) { return { t: n, n: nombres[n] || 0 }; }).filter(function (x, i) { return x.n || i > 0; })
-      .concat([{ t: 'Entre actos o por iniciar', n: cnt.antes, gris: 1 }, { t: 'Cronograma concluido', n: cnt.fin, gris: 1 }, { t: 'Sin cronograma registrado', n: cnt.sin, gris: 1 }]);
+      .map(function (x) { x.k = x.t; return x; })
+      .concat([{ k: '_antes', t: ACTO_TXT._antes, n: cnt.antes, gris: 1 }, { k: '_fin', t: ACTO_TXT._fin, n: cnt.fin, gris: 1 }, { k: '_sin', t: ACTO_TXT._sin, n: cnt.sin, gris: 1 }]);
     var maxA = Math.max.apply(null, filasActo.map(function (x) { return x.n; }).concat([1]));
     var barrasA = filasActo.map(function (x) {
-      return '<div class="hb fija' + (x.gris ? ' gris' : '') + (x.n ? '' : ' cero') + '" tabindex="0" data-tip="<b>' + num(x.n) + '</b> proceso' + (x.n === 1 ? '' : 's') + ' · ' + et(x.t) +
-        '"><span class="hb-l">' + esc(x.t) + '</span><span class="hb-t"><span class="hb-f" style="width:' + (x.n ? Math.max(2, 100 * x.n / maxA) : 0) + '%"></span></span><span class="hb-v">' + num(x.n) + '</span></div>';
+      // v2: clic → filtro por ese acto y pestaña Cronograma
+      return '<button class="hb' + (x.gris ? ' gris' : '') + (S.f.acto === x.k ? ' on' : '') + (x.n ? '' : ' cero') + '" data-acto="' + esc(x.k) + '" data-tip="<b>' + num(x.n) + '</b> proceso' + (x.n === 1 ? '' : 's') + ' · ' + et(x.t) +
+        '<br><i>Clic: ver en el cronograma</i>"><span class="hb-l">' + esc(x.t) + '</span><span class="hb-t"><span class="hb-f" style="width:' + (x.n ? Math.max(2, 100 * x.n / maxA) : 0) + '%"></span></span><span class="hb-v">' + num(x.n) + '</span></button>';
     }).join('');
     h += '<div class="g2"><div class="card"><h2>¿En qué paso está el registro?</h2><p class="nota">Paso vigente de cada proceso en la herramienta (los 12 pasos del numeral 7 de la Directiva). Haga clic en una barra para ver esos procesos.</p><div class="hbars">' + barras + '</div></div>' +
-      '<div class="card"><h2>¿Qué acto del cronograma se realiza hoy?</h2><p class="nota">Según las fechas del cronograma (Anexo 3) de cada proceso en curso, al ' + L.fecha(L.hoyLima()) + '.</p><div class="hbars">' + barrasA + '</div></div></div>';
+      '<div class="card"><h2>¿Qué acto del cronograma se realiza hoy?</h2><p class="nota">Según las fechas del cronograma (Anexo 3) de cada proceso en curso, al ' + L.fecha(L.hoyLima()) + '. Haga clic en una barra para ver esos procesos en el cronograma.</p><div class="hbars">' + barrasA + '</div></div></div>';
 
     // alertas de agricultura familiar
     var al = arr.alertas.filter(function (a) { return base.some(function (p) { return p.id === a.id; }); });
@@ -255,7 +268,11 @@
     h += '<div class="card"><div class="cab"><h2>Cronogramas de los procesos</h2><span class="ley"><span><i class="sw af"></i>Invitación directa AF</span><span><i class="sw cp"></i>Convocatoria pública</span><span><i class="sw hoy"></i>Hoy</span></span></div>' +
       '<p class="nota">Cada barra es un proceso y cada tramo, un acto de su cronograma (Anexo 3). Los tramos ya realizados y el acto en curso van en color pleno; los siguientes, en tono claro. ' +
       (sin ? num(sin) + ' proceso' + (sin === 1 ? '' : 's') + ' de este filtro aún no registra' + (sin === 1 ? '' : 'n') + ' cronograma.' : '') + '</p>';
-    if (!con.length) return h + vacio('Ningún proceso de este filtro tiene cronograma registrado.') + '</div>';
+    var sinCro = ps.filter(function (p) { return !(p.actos && p.actos.length); });
+    var listaSin = sinCro.length ? '<ul class="sin-cro">' + sinCro.sort(function (a, b) { return String(a.utn).localeCompare(String(b.utn), 'es') || String(a.zona).localeCompare(String(b.zona), 'es'); }).map(function (p) {
+      return '<li><button class="lnk" data-abrir="' + esc(p.id) + '">' + esc(p.utn) + ' · ' + esc(p.zona) + '</button> ' + chipMod(p.mod) + ' <span class="muted">' + esc(L.PASO_CORTO[p.paso] || '') + '</span></li>';
+    }).join('') + '</ul>' : '';
+    if (!con.length) return h + vacio('Ningún proceso de este filtro tiene cronograma registrado.') + listaSin + '</div>';
     con.sort(function (a, b) { return a.actos[0][0] < b.actos[0][0] ? -1 : a.actos[0][0] > b.actos[0][0] ? 1 : String(a.utn).localeCompare(String(b.utn), 'es'); });
     var ini = con.reduce(function (m, p) { return p.actos[0][0] < m ? p.actos[0][0] : m; }, hoy), fin = con.reduce(function (m, p) { var f = p.actos[p.actos.length - 1][1]; return f > m ? f : m; }, hoy);
     ini = L.sumarDias(ini, -2); fin = L.sumarDias(fin, 3);
@@ -273,7 +290,8 @@
         }).join('');
         return '<div class="g-f ' + (p.mod === 'AF' ? 'af' : 'cp') + '" data-abrir="' + esc(p.id) + '" tabindex="0"><div class="g-l"><b>' + esc(p.utn.replace(/^(UT|OCT) /, '')) + '</b> ' + esc(p.zona) +
           (p.reprog ? ' <span class="tag info" title="Cronograma reprogramado">R</span>' : '') + '</div><div class="g-t">' + segs + '</div></div>';
-      }).join('') + '<div class="g-linea" aria-hidden="true"></div></div></div></div>';
+      }).join('') + '<div class="g-linea" aria-hidden="true"></div></div></div>' +
+      (listaSin ? '<details class="sin-cro-d"><summary>Ver los ' + num(sinCro.length) + ' proceso' + (sinCro.length === 1 ? '' : 's') + ' sin cronograma</summary>' + listaSin + '</details>' : '') + '</div>';
     return h;
   }
 
@@ -349,15 +367,29 @@
   }
 
   // ==================================================================== ACTIVIDAD
+  /** Últimos registros por UT/OCT y, dentro, por zona y paquete (lo que cambió cada guardado). Se recuerda qué UT/OCT se plegó. */
   function vistaActividad() {
     var e = S.estado;
-    var h = '<div class="card"><div class="cab"><h2>Últimos registros en la herramienta</h2><span class="nota">Cada vez que una especialista guarda un proceso, aparece aquí y el tablero se actualiza.' +
+    var h = '<div class="card"><div class="cab"><h2>Últimos registros en la herramienta</h2><span class="nota">Por UT/OCT, zona y paquete. Cada vez que una especialista guarda un proceso, aparece aquí, en los paquetes que cambió, y el tablero se actualiza.' +
       (e && e.sinc ? ' Revisión completa de todos los procesos: ' + esc(L.fechaHora(e.sinc)) + '.' : '') + '</span></div>';
     if (!S.vivo.length) return h + vacio('Todavía no hay registros desde que se activó el tablero.') + '</div>';
-    return h + '<ul class="feed">' + S.vivo.map(function (v) {
-      return '<li><span class="hora" title="' + esc(L.fechaHora(v.t)) + '">' + esc(L.haceCuanto(v.t)) + '</span><div><div><button class="lnk" data-abrir="' + esc(v.id) + '">' + esc(v.ut) + ' · ' + esc(v.z) + '</button> ' + chipMod(v.m) +
-        ' <span class="muted">' + esc(String(v.c || '').toLowerCase()) + '</span></div><div>' + esc(v.a) + (v.u ? ' <span class="muted">· ' + esc(v.u) + '</span>' : '') + '</div></div></li>';
-    }).join('') + '</ul></div>';
+    var hoy = L.hoyLima(), uts = L.agruparVivo(S.vivo, function (id) { return S.P.get(id); });
+    return h + uts.map(function (u) {
+      return '<details class="act-ut" data-actut="' + esc(u.ut) + '"' + (S.actCerradas.has(u.ut) ? '' : ' open') + '><summary><span class="act-utn">' + esc(u.ut) + '</span>' +
+        '<span class="muted">' + num(u.zonas.length) + ' zona' + (u.zonas.length === 1 ? '' : 's') + ' · ' + num(u.n) + ' registro' + (u.n === 1 ? '' : 's') + ' · último ' + esc(L.haceCuanto(u.t)) + '</span></summary>' +
+        u.zonas.map(function (z) {
+          var p = S.P.get(z.id);
+          return '<div class="act-zona"><div class="act-zc"><button class="lnk" data-abrir="' + esc(z.id) + '">' + esc(z.z) + '</button> ' + chipMod(z.m) +
+            ' <span class="muted">' + esc(String(z.c || '').toLowerCase()) + '</span>' + (p ? ' ' + badgeEst(L.estadoHoy(p, hoy)) : ' <span class="muted">· ya no está en el tablero</span>') + '</div>' +
+            z.paquetes.map(function (q) {
+              var paq = q.c && q.c !== '?';
+              return '<div class="act-paq' + (paq ? '' : ' gen') + '"><div class="act-pt">' + (paq ? '<span class="pq">' + esc(q.c) + '</span> ' + esc(q.n) : esc(q.n)) + '</div><ul class="feed">' +
+                q.regs.map(function (v) {
+                  return '<li><span class="hora" title="' + esc(L.fechaHora(v.t)) + '">' + esc(L.haceCuanto(v.t)) + '</span><div>' + esc(v.a) + (v.u ? ' <span class="muted">· ' + esc(v.u) + '</span>' : '') + '</div></li>';
+                }).join('') + '</ul></div>';
+            }).join('') + '</div>';
+        }).join('') + '</details>';
+    }).join('') + '</div>';
   }
 
   // ==================================================================== DETALLE DE UN PROCESO
@@ -444,9 +476,10 @@
     var c = $('#chips'), f = S.f, t = [];
     if (f.est) t.push(['est', 'Estado: ' + (NOMBRE_EST[f.est] || f.est)]);
     if (f.paso) t.push(['paso', 'Paso: ' + L.PASO_CORTO[f.paso]]);
+    if (f.acto) t.push(['acto', 'Acto de hoy: ' + actoTxt(f.acto)]);
     c.innerHTML = t.map(function (x) { return '<button class="fchip" data-quitar="' + x[0] + '">' + esc(x[1]) + ' <span aria-hidden="true">×</span><span class="sr">Quitar filtro</span></button>'; }).join('');
     c.hidden = !t.length;
-    var hay = f.ut || f.sect || f.mod || f.est || f.q || f.paso;
+    var hay = f.ut || f.sect || f.mod || f.est || f.q || f.paso || f.acto;
     $('#limpiar').disabled = !hay;
   }
   function opcionesFiltros() {
@@ -483,11 +516,13 @@
     $('#fSect').onchange = function () { S.f.sect = this.value; opcionesFiltros(); guardarFiltros(); programar(); };
     $('#fMod').onchange = function () { S.f.mod = this.value; guardarFiltros(); programar(); };
     var tq = 0; $('#fQ').oninput = function () { var v = this.value; clearTimeout(tq); tq = setTimeout(function () { S.f.q = v.trim(); guardarFiltros(); programar(); }, 200); };
-    $('#limpiar').onclick = function () { S.f = { ut: '', sect: '', mod: '', est: '', q: '', paso: '' }; opcionesFiltros(); guardarFiltros(); programar(); };
+    $('#limpiar').onclick = function () { S.f = { ut: '', sect: '', mod: '', est: '', q: '', paso: '', acto: '' }; opcionesFiltros(); guardarFiltros(); programar(); };
     $('#btnSalir').onclick = function () { if (H.salir) H.salir(); };
     // delegación de clics
+    // últimos registros: se recuerda qué UT/OCT plegó el usuario (el evento toggle no burbujea: se escucha en captura)
+    document.addEventListener('toggle', function (ev) { var d = ev.target; if (d && d.matches && d.matches('details[data-actut]')) { if (d.open) S.actCerradas.delete(d.getAttribute('data-actut')); else S.actCerradas.add(d.getAttribute('data-actut')); } }, true);
     document.addEventListener('click', function (ev) {
-      var t = ev.target.closest('[data-abrir],[data-est],[data-paso],[data-ut],[data-quitar],[data-ali],#csv,.cerrar,#modal');
+      var t = ev.target.closest('[data-abrir],[data-est],[data-paso],[data-acto],[data-ut],[data-quitar],[data-ali],#csv,.cerrar,#modal');
       if (!t) return;
       if (t.id === 'modal') { if (ev.target === t) cerrar(); return; }
       if (t.classList.contains('cerrar')) { cerrar(); return; }
@@ -496,8 +531,9 @@
       if (t.hasAttribute('data-quitar')) { S.f[t.getAttribute('data-quitar')] = ''; guardarFiltros(); programar(); return; }
       if (t.hasAttribute('data-ut')) { S.f.ut = t.getAttribute('data-ut'); opcionesFiltros(); guardarFiltros(); cambiarVista('pro'); window.scrollTo({ top: 0 }); return; }
       if (t.hasAttribute('data-ali')) { var k = t.getAttribute('data-ali'); S.abiertoPre[k] = !S.abiertoPre[k]; programar(); return; }
-      if (t.hasAttribute('data-paso')) { var p = t.getAttribute('data-paso'); S.f.paso = S.f.paso === p ? '' : p; if (S.f.paso) S.f.est = ''; guardarFiltros(); if (S.f.paso) cambiarVista('pro'); else programar(); return; }
-      if (t.hasAttribute('data-est')) { var e = t.getAttribute('data-est'); S.f.est = S.f.est === e ? '' : e; if (e) S.f.paso = ''; guardarFiltros(); programar(); }
+      if (t.hasAttribute('data-paso')) { var p = t.getAttribute('data-paso'); S.f.paso = S.f.paso === p ? '' : p; if (S.f.paso) { S.f.est = ''; S.f.acto = ''; } guardarFiltros(); if (S.f.paso) cambiarVista('pro'); else programar(); return; }
+      if (t.hasAttribute('data-acto')) { var ak = t.getAttribute('data-acto'); S.f.acto = S.f.acto === ak ? '' : ak; if (S.f.acto) { S.f.est = ''; S.f.paso = ''; } guardarFiltros(); if (S.f.acto) { cambiarVista('cro'); window.scrollTo({ top: 0 }); } else programar(); return; }
+      if (t.hasAttribute('data-est')) { var e = t.getAttribute('data-est'); S.f.est = S.f.est === e ? '' : e; if (e) { S.f.paso = ''; S.f.acto = ''; } guardarFiltros(); programar(); }
     });
     document.addEventListener('keydown', function (ev) {
       if (ev.key === 'Escape' && S.abierto) { cerrar(); return; }
