@@ -396,8 +396,10 @@ table.tb{width:100%;border-collapse:collapse;font-size:14.5px}
 <div id="tip" role="tooltip" hidden></div>
 <div id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="logica.js"></script>
-<script src="app.js"></script>
-<script type="module" src="boot.mjs"></script>
+<!-- ?v=: subir el número en cada actualización; GitHub Pages deja los archivos 10 min en la caché del navegador
+     y, sin él, una página nueva puede cargar el código anterior -->
+<script src="logica.js?v=2.0.46"></script>
+<script src="app.js?v=2.0.46"></script>
+<script type="module" src="boot.mjs?v=2.0.46"></script>
 </body>
 </html>
