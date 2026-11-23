@@ -14,6 +14,9 @@
  *     Si Firestore no responde, el guardado sigue normal: el error queda
  *     anotado y la sincronización de cada hora lo corrige.
  *   - Al eliminar un proceso, tcRetirarProceso_(p, usuario) lo quita.
+ *   - v2.0.45: cada registro de «últimos registros» trae los paquetes que cambió
+ *     ese guardado (p: ['NP', 'P1'…]; vacío = datos de toda la zona), para
+ *     agruparlos en la página por UT/OCT, zona y paquete.
  *   - Los procesos de prueba no se publican (y se retiran si cambian a prueba).
  *   - Un activador revisa cada hora todos los procesos y corrige diferencias
  *     (cambios hechos a mano en la base, usuarios, sectorización).
@@ -59,16 +62,17 @@ var TC_BASE = 'https://firestore.googleapis.com/v1/projects/' + TC.PROYECTO + '/
 // ====================================================================== líneas que llama la herramienta
 
 /** Publica un proceso recién guardado. Nunca lanza errores: el guardado de la herramienta no debe fallar por esto. */
-function tcPublicarProceso_(proc, usuario) {
+function tcPublicarProceso_(proc, usuario, anterior) {
   try {
     if (!tcActivo_() || !proc || !proc.id) return;
     var cambios;
     if (tcEsPrueba_(proc)) cambios = tcBorrarDocs_(proc.id);
     else {
-      var b = tcConstruir_(proc, proc._idx || null, tcContexto_());
+      var b = tcConstruir_(proc, proc._idx || null, tcContexto_()), paq = [];
+      try { paq = tcPaquetesTocados_(anterior, proc); } catch (e) { console.warn('Paquetes del registro ' + proc.id + ': ' + e.message); }
       cambios = tcCambiosDe_(b);
       cambios.push(tcEvento_({ id: proc.id, ut: b.doc.utn, z: b.doc.zona, m: b.doc.mod, c: b.doc.conv,
-        a: Number(proc.version) === 1 ? 'Registró el proceso' : tcTextoAvance_(b.doc), u: tcNombreUsuario_(usuario) }));
+        a: Number(proc.version) === 1 ? 'Registró el proceso' : tcTextoAvance_(b.doc), u: tcNombreUsuario_(usuario), p: paq }));
     }
     tcLote_(cambios, 1);
   } catch (e) { tcError_('Publicar ' + (proc && proc.id), e); }
@@ -80,7 +84,7 @@ function tcRetirarProceso_(p, usuario) {
     if (!tcActivo_() || !p || !p.id) return;
     var cambios = tcBorrarDocs_(p.id);
     if (!tcEsPrueba_(p)) cambios.push(tcEvento_({ id: p.id, ut: p.utNombre || p.ut, z: p.zona, m: p.modalidad, c: p.convocatoria,
-      a: 'Eliminó el proceso', u: tcNombreUsuario_(usuario) }));
+      a: 'Eliminó el proceso', u: tcNombreUsuario_(usuario), p: [] }));
     tcLote_(cambios, 1);
   } catch (e) { tcError_('Retirar ' + (p && p.id), e); }
 }
@@ -320,6 +324,58 @@ function tcEvento_(e) {
 var TC_PASOS = { zona: '7.1.1 Zona o CG', paquete: '7.1.2 Paquete de alimentos', crono: '7.1.3 Cronograma', repres: '7.1.6 Representantes',
   conv: 'Convocatoria o invitación', recep: 'Presentación de propuestas', verif: 'Verificación preliminar', doc: 'Evaluación documentaria',
   alm: 'Evaluación de almacenes', cot: 'Evaluación de cotizaciones', res: 'Resultados', acta: 'Acta de compromiso', herramienta: 'Lista para la herramienta de menú' };
+/**
+ * v2.0.45: paquetes (NP, P1, P2…) cuyos datos cambiaron entre la versión anterior y la nueva del proceso: alimentos, datos del
+ * paquete, paquetes marcados en 7.1.1, documentos generados, invitados y lo que se registra por paquete en la evaluación
+ * (postores, etapas, actas…). Lo que no es de un paquete (SA, cronograma, representantes…) no cuenta: con lista vacía, el
+ * registro es de toda la zona. Un proceso nuevo (sin versión anterior) también va como toda la zona.
+ */
+function tcPaquetesTocados_(antes, despues) {
+  if (!antes || !despues) return [];
+  var out = {}, grupos = {}, validos = {}, j = function (x) { return JSON.stringify(x === undefined ? null : x); };
+  Calc.PAQUETES.forEach(function (c) { validos[c] = true; });
+  [antes, despues].forEach(function (p) {
+    (p.paquetes || []).forEach(function (x) { if (x && x.codigo) validos[x.codigo] = true; });
+    try { Calc.gruposEvaluacion(p).forEach(function (g) { grupos[g.clave] = (grupos[g.clave] || []).concat(g.paquetes || []); }); } catch (e) { }
+  });
+  // una clave de evaluación (p. ej. EXC) cuenta por sus paquetes; las claves que no son paquetes (TODOS, nombres de actos) no cuentan
+  var marcar = function (clave) {
+    String(clave || '').split('|').forEach(function (k) {
+      if (grupos[k] && grupos[k].length) grupos[k].forEach(function (c) { out[c] = true; });
+      else if (validos[k]) out[k] = true;
+    });
+  };
+  var dif = function (a, d) { Object.keys(a).concat(Object.keys(d)).forEach(function (k) { if (j(a[k]) !== j(d[k])) marcar(k); }); };
+  var porPaq = function (p) { var o = {}; (p.lineas || []).forEach(function (l) { (o[l.paquete] = o[l.paquete] || []).push(l); }); return o; };
+  var datosPaq = function (p) { var o = {}; (p.paquetes || []).forEach(function (x) { if (x && x.codigo) o[x.codigo] = x; }); return o; };
+  var previstos = function (p) { var o = {}; (p.paquetesPrevistos || []).forEach(function (c) { o[c] = true; }); return o; };
+  var lineasD = porPaq(despues);
+  dif(porPaq(antes), lineasD);
+  dif(datosPaq(antes), datosPaq(despues));
+  dif(previstos(antes), previstos(despues));
+  ['generados', 'nombresGen', 'postores', 'subsanacion', 'frio', 'firma', 'firmaAF', 'etapas', 'compromiso', 'observaciones', 'firmantes'].forEach(function (campo) {
+    var a = antes[campo], d = despues[campo];
+    if ((a && (typeof a !== 'object' || Array.isArray(a))) || (d && (typeof d !== 'object' || Array.isArray(d)))) return;
+    dif(a || {}, d || {});
+  });
+  // invitados (agricultura familiar): cuentan los paquetes en que cambió la invitación o el N° de carta; si cambian sus datos
+  // (nombre, RUC, invitar…), o se agrega o quita, todos sus paquetes (sin lista de paquetes: todos los paquetes con alimentos)
+  var inv = function (p) { var o = {}; (p.invitados || []).forEach(function (x, i) { o[String(x.cod || x.ruc || x.empresa || i)] = x; }); return o; };
+  var ia = inv(antes), id = inv(despues), todos = Object.keys(lineasD);
+  var paqInv = function (x) { return x ? (x.paquetes || todos) : []; };
+  var resto = function (x) { var o = {}; Object.keys(x).forEach(function (k) { if (k !== 'paquetes' && k !== 'numeros') o[k] = x[k]; }); return j(o); };
+  Object.keys(ia).concat(Object.keys(id)).forEach(function (k) {
+    var xa = ia[k], xd = id[k];
+    if (j(xa) === j(xd)) return;
+    if (!xa || !xd || resto(xa) !== resto(xd)) { paqInv(xa).concat(paqInv(xd)).forEach(marcar); return; }
+    var pa = paqInv(xa), pd = paqInv(xd);
+    pa.forEach(function (c) { if (pd.indexOf(c) < 0) marcar(c); });
+    pd.forEach(function (c) { if (pa.indexOf(c) < 0) marcar(c); });
+    dif(xa.numeros || {}, xd.numeros || {});
+  });
+  var orden = Calc.PAQUETES.filter(function (c) { return out[c]; });
+  return orden.concat(Object.keys(out).filter(function (c) { return orden.indexOf(c) < 0; }).sort());
+}
 function tcTextoAvance_(doc) {
   if (/Adjudicado|Desierto|Cancelado/.test(doc.est)) return 'Actualizó el proceso (' + doc.est.toLowerCase() + ')';
   return 'Actualizó: ' + (TC_PASOS[doc.paso] || doc.paso || 'registro') + ' · ' + doc.pasosOk + ' de 12 pasos';
