@@ -143,6 +143,41 @@
     return out.sort(function (x, y) { return x.fecha < y.fecha ? -1 : x.fecha > y.fecha ? 1 : String(x.p.utn).localeCompare(String(y.p.utn), 'es') || x.i - y.i; });
   }
 
+  /** Orden de las zonas: ZONA I, II, III… (por su número romano) y después los CG, por nombre. */
+  var ROMANOS = { I: 1, V: 5, X: 10, L: 50 };
+  function numeroRomano(s) {
+    var t = 0, mayor = 0;
+    String(s || '').toUpperCase().split('').reverse().forEach(function (c) { var v = ROMANOS[c] || 0; t += v < mayor ? -v : v; mayor = Math.max(mayor, v); });
+    return t;
+  }
+  function ordenZona(a, b) {
+    var ra = /^ZONA\s+([IVXL]+)\b/i.exec(String(a || '')), rb = /^ZONA\s+([IVXL]+)\b/i.exec(String(b || ''));
+    if (ra && rb) return numeroRomano(ra[1]) - numeroRomano(rb[1]) || String(a).localeCompare(String(b), 'es');
+    if (ra) return -1;
+    if (rb) return 1;
+    return String(a || '').localeCompare(String(b || ''), 'es');
+  }
+  /** Agenda de un día agrupada por UT/OCT (orden alfabético) y, dentro de cada una, por zona o CG y por acto. */
+  function agendaPorUT(items) {
+    var g = {};
+    (items || []).forEach(function (x) { (g[x.p.utn] = g[x.p.utn] || []).push(x); });
+    return Object.keys(g).sort(function (a, b) { return a.localeCompare(b, 'es'); }).map(function (ut) {
+      var xs = g[ut].slice().sort(function (a, b) { return ordenZona(a.p.zona, b.p.zona) || a.i - b.i; }), ids = {};
+      xs.forEach(function (x) { ids[x.p.id] = true; });
+      return { titulo: ut, xs: xs, nProc: Object.keys(ids).length };
+    });
+  }
+  /** Agenda de un día agrupada por etapa (acto del cronograma, en el orden del proceso) y, dentro, por UT/OCT y zona o CG. */
+  function agendaPorActo(items) {
+    var g = {};
+    (items || []).forEach(function (x) { var o = g[x.acto] = g[x.acto] || { xs: [], i: x.i }; o.xs.push(x); o.i = Math.min(o.i, x.i); });
+    return Object.keys(g).sort(function (a, b) { return g[a].i - g[b].i || a.localeCompare(b, 'es'); }).map(function (acto) {
+      var xs = g[acto].xs.slice().sort(function (a, b) { return String(a.p.utn).localeCompare(String(b.p.utn), 'es') || ordenZona(a.p.zona, b.p.zona); }), ids = {};
+      xs.forEach(function (x) { ids[x.p.id] = true; });
+      return { titulo: acto, xs: xs, nProc: Object.keys(ids).length };
+    });
+  }
+
   // ------------------------------------------------------------------ agregados
   function mediana(v) {
     var s = v.slice().sort(function (a, b) { return a - b; }), m = s.length;
@@ -236,7 +271,7 @@
     MODALIDAD: MODALIDAD, MOD_CORTA: MOD_CORTA, ACTOS_CP: ACTOS_CP, ACTOS_AF: ACTOS_AF, PASOS: PASOS, PASO_CORTO: PASO_CORTO, ESTADOS: ESTADOS, FINALES: FINALES,
     etapas: etapas, nombrePaso: nombrePaso, actos: actos, esAF: esAF,
     hoyLima: hoyLima, horaLima: horaLima, fecha: fecha, fechaCorta: fechaCorta, fechaHora: fechaHora, sumarDias: sumarDias, diasEntre: diasEntre, diaUTC: diaUTC, haceCuanto: haceCuanto,
-    estadoHoy: estadoHoy, enCurso: enCurso, actoHoy: actoHoy, alertasAF: alertasAF, agenda: agenda,
+    estadoHoy: estadoHoy, enCurso: enCurso, actoHoy: actoHoy, alertasAF: alertasAF, agenda: agenda, agendaPorUT: agendaPorUT, agendaPorActo: agendaPorActo, ordenZona: ordenZona,
     mediana: mediana, preciosPorAlimento: preciosPorAlimento, agruparVivo: agruparVivo, pasoDeRegistro: pasoDeRegistro,
     num: num, soles: soles, pct: pct, esc: esc, norm: norm
   };

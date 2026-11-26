@@ -14,7 +14,7 @@
     meta: null, P: new Map(), PR: new Map(), vivo: [], estado: null,
     preciosPedidos: false, preciosListos: false, listo: false,
     f: { ut: '', sect: '', mod: '', est: '', q: '', paso: '', acto: '' },
-    vista: 'res', orden: 'ut', diasAg: 14, abierto: null, abiertoPre: {}, recientes: new Map(), ultimoAviso: '', qPre: '',
+    vista: 'res', orden: 'ut', diasAg: 14, agAgr: 'ut', abierto: null, abiertoPre: {}, recientes: new Map(), ultimoAviso: '', qPre: '',
     actCerradas: new Set(), actAbiertos: new Set()
   };
   var H = {};      // acciones que entrega boot.mjs: pedirPrecios(), salir()
@@ -254,14 +254,21 @@
     var dias = {}; ag.forEach(function (x) { (dias[x.fecha] = dias[x.fecha] || []).push(x); });
     var DSEM = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
     h += '<div class="card"><div class="cab"><h2>Agenda de los próximos ' + S.diasAg + ' días</h2><span class="nota">Actos del cronograma de ' + esc(filtroActivoTxt()) + '</span>' +
-      '<span class="der"><label class="sel">Mostrar <select id="diasAg">' + [7, 14, 30].map(function (n) { return '<option value="' + n + '"' + (n === S.diasAg ? ' selected' : '') + '>' + n + ' días</option>'; }).join('') + '</select></label></span></div>' +
+      '<span class="der"><span class="sel">Agrupar por <span class="seg" role="group" aria-label="Agrupar la agenda por">' +
+      [['ut', 'UT/OCT'], ['acto', 'Etapa del proceso']].map(function (o) { return '<button type="button" data-agagr="' + o[0] + '" aria-pressed="' + (S.agAgr === o[0]) + '">' + o[1] + '</button>'; }).join('') + '</span></span>' +
+      '<label class="sel">Mostrar <select id="diasAg">' + [7, 14, 30].map(function (n) { return '<option value="' + n + '"' + (n === S.diasAg ? ' selected' : '') + '>' + n + ' días</option>'; }).join('') + '</select></label></span></div>' +
       (ag.length ? '<div class="agenda">' + Object.keys(dias).sort().map(function (d) {
         var dt = new Date(L.diaUTC(d)), nom = d === hoy ? 'Hoy' : d === L.sumarDias(hoy, 1) ? 'Mañana' : DSEM[dt.getUTCDay()];
-        return '<div class="ag-dia"><div class="ag-f"><b>' + nom.charAt(0).toUpperCase() + nom.slice(1) + '</b><span>' + L.fecha(d) + '</span></div><ul>' + dias[d].map(function (x) {
-          var cierra = x.hasta === d, empieza = x.desde === d;
-          return '<li><div><button class="lnk" data-abrir="' + esc(x.p.id) + '">' + esc(x.p.utn) + ' · ' + esc(x.p.zona) + '</button> ' + chipMod(x.p.mod) + '</div><div class="ag-l2"><span class="ag-a">' + esc(x.acto) + '</span> <span class="muted">' +
-            (empieza && cierra ? '(un día)' : empieza ? '(empieza; hasta el ' + L.fechaCorta(x.hasta) + ')' : cierra ? '(último día)' : '(en curso; hasta el ' + L.fechaCorta(x.hasta) + ')') + '</span></div></li>';
-        }).join('') + '</ul></div>';
+        // cada día, agrupado por UT/OCT (y en cada una, sus zonas o CG con el acto del día) o por etapa del proceso (y en cada una, las UT/OCT y zonas)
+        var porActo = S.agAgr === 'acto';
+        return '<div class="ag-dia"><div class="ag-f"><b>' + nom.charAt(0).toUpperCase() + nom.slice(1) + '</b><span>' + L.fecha(d) + '</span></div>' + (porActo ? L.agendaPorActo(dias[d]) : L.agendaPorUT(dias[d])).map(function (g) {
+          return '<div class="ag-ut"><div class="ag-utn">' + esc(g.titulo) + (g.nProc > 1 ? ' <span class="muted">· ' + g.nProc + ' procesos</span>' : '') + '</div><ul>' + g.xs.map(function (x) {
+            var cierra = x.hasta === d, empieza = x.desde === d;
+            var est = '<span class="muted">' + (empieza && cierra ? '(un día)' : empieza ? '(empieza; hasta el ' + L.fechaCorta(x.hasta) + ')' : cierra ? '(último día)' : '(en curso; hasta el ' + L.fechaCorta(x.hasta) + ')') + '</span>';
+            return '<li><div><button class="lnk" data-abrir="' + esc(x.p.id) + '">' + (porActo ? esc(x.p.utn) + ' · ' : '') + esc(x.p.zona) + '</button> ' + chipMod(x.p.mod) + '</div><div class="ag-l2">' +
+              (porActo ? est : '<span class="ag-a">' + esc(x.acto) + '</span> ' + est) + '</div></li>';
+          }).join('') + '</ul></div>';
+        }).join('') + '</div>';
       }).join('') + '</div>' : vacio('No hay actos programados en los próximos ' + S.diasAg + ' días.')) + '</div>';
 
     // diagrama de Gantt
@@ -531,6 +538,7 @@
   function iniciar(acciones) {
     H = acciones || {};
     try { var g = JSON.parse(localStorage.getItem('conv2027_f') || 'null'); if (g) Object.keys(S.f).forEach(function (k) { if (typeof g[k] === 'string') S.f[k] = g[k]; }); } catch (e) { }
+    try { if (localStorage.getItem('conv2027_agagr') === 'acto') S.agAgr = 'acto'; } catch (e) { }
     $$('[data-vista]').forEach(function (b) { b.onclick = function () { cambiarVista(b.getAttribute('data-vista')); window.scrollTo({ top: 0 }); }; });
     $('#fUT').onchange = function () { S.f.ut = this.value; guardarFiltros(); programar(); };
     $('#fSect').onchange = function () { S.f.sect = this.value; opcionesFiltros(); guardarFiltros(); programar(); };
@@ -546,12 +554,13 @@
       if (d.matches('details[data-actg]')) { if (d.open) S.actAbiertos.add(d.getAttribute('data-actg')); else S.actAbiertos.delete(d.getAttribute('data-actg')); }
     }, true);
     document.addEventListener('click', function (ev) {
-      var t = ev.target.closest('[data-abrir],[data-est],[data-paso],[data-acto],[data-ut],[data-quitar],[data-ali],#csv,.cerrar,#modal');
+      var t = ev.target.closest('[data-abrir],[data-est],[data-paso],[data-acto],[data-ut],[data-quitar],[data-ali],[data-agagr],#csv,.cerrar,#modal');
       if (!t) return;
       if (t.id === 'modal') { if (ev.target === t) cerrar(); return; }
       if (t.classList.contains('cerrar')) { cerrar(); return; }
       if (t.id === 'csv') { descargarCSV(); return; }
       if (t.hasAttribute('data-abrir')) { abrir(t.getAttribute('data-abrir')); return; }
+      if (t.hasAttribute('data-agagr')) { S.agAgr = t.getAttribute('data-agagr') === 'acto' ? 'acto' : 'ut'; try { localStorage.setItem('conv2027_agagr', S.agAgr); } catch (e) { } programar(); return; }
       if (t.hasAttribute('data-quitar')) { S.f[t.getAttribute('data-quitar')] = ''; guardarFiltros(); programar(); return; }
       if (t.hasAttribute('data-ut')) { S.f.ut = t.getAttribute('data-ut'); opcionesFiltros(); guardarFiltros(); cambiarVista('pro'); window.scrollTo({ top: 0 }); return; }
       if (t.hasAttribute('data-ali')) { var k = t.getAttribute('data-ali'); S.abiertoPre[k] = !S.abiertoPre[k]; programar(); return; }
