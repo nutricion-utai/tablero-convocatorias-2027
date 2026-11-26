@@ -20,6 +20,10 @@
  *   - v2.0.46: y el detalle de lo que cambió (d: [[paquete, texto]…]; paquete
  *     vacío = dato de toda la zona). La lista se guarda en varias propiedades
  *     (TC_VIVO, TC_VIVO_2…) porque cada una admite unos 9 KB.
+ *   - v2.0.49: cada paquete desierto trae su motivo (md: {paquete: texto}): qué
+ *     pasó con cada propuesta (no admitida, no apta o descalificada, en qué etapa
+ *     y por qué), y el número de propuestas registradas por paquete (npq), que
+ *     incluye las que no llegaron a la evaluación de cotizaciones.
  *   - Los procesos de prueba no se publican (y se retiran si cambian a prueba).
  *   - Un activador revisa cada hora todos los procesos y corrige diferencias
  *     (cambios hechos a mano en la base, usuarios, sectorización).
@@ -258,9 +262,11 @@ function tcConstruir_(proc, idx, ctx) {
   });
 
   // resultados por paquete (prelación en convocatoria pública; postores en agricultura familiar)
-  var res = [];
+  var res = [], npq = {};
   try {
     Calc.gruposEvaluacion(proc).forEach(function (g) {
+      var nReg = Calc.postoresRegistrados(proc, g.clave).length;   // v2.0.49: propuestas registradas, aunque no lleguen a cotización
+      if (nReg) npq[g.clave] = nReg;
       var ev = Calc.evaluar(proc, g.clave, og);
       var np = g.paquetes.map(nombrePaq).filter(String).join(' / ');
       (af ? ev.postores : ev.prelacion).forEach(function (p) {
@@ -281,6 +287,12 @@ function tcConstruir_(proc, idx, ctx) {
 
   var resPaq = {};
   String(idx.resultado || '').split(/\s+/).filter(String).forEach(function (x) { var y = x.split(':'); if (y[0]) resPaq[y[0]] = y[1] || ''; });
+  // v2.0.49: motivo de cada paquete desierto (solo si hay alguno, para no cambiar los demás documentos)
+  var md = {};
+  Object.keys(resPaq).forEach(function (k) {
+    if (resPaq[k] !== 'desierto') return;
+    try { md[k] = tcMotivoDesierto_(proc, k, Calc.evaluar(proc, k, og)); } catch (e) { console.warn('Motivo del desierto de ' + proc.id + ' ' + k + ': ' + e.message); }
+  });
   var actos = String(idx.actos || '').split('|').filter(String).map(function (x) { var y = x.split('~'); return [y[0] || '', y[1] || '']; });
   var c = proc.crono || {}, reprog = false;
   try { reprog = Calc.reprogramado(c); } catch (e) { }
@@ -299,6 +311,8 @@ function tcConstruir_(proc, idx, ctx) {
     esp: ctx.usuarios[normCorreo_(proc.propietario)] || '', cre: String(proc.creado || ''), act: String(proc.actualizado || ''), ver: Number(proc.version) || 0,
     fEval: String(proc.fechaEval || ''), paqs: paqs, res: res, nAdj: filas.length
   };
+  if (Object.keys(md).length) doc.md = md;
+  if (Object.keys(npq).length) doc.npq = npq;
   var d = JSON.stringify(doc), ahora = tcAhora_();
   var out = { doc: doc, proc: { d: d, h: tcHash_(d), v: doc.ver, t: ahora }, precios: null };
   if (filas.length) {
@@ -306,6 +320,41 @@ function tcConstruir_(proc, idx, ctx) {
     out.precios = { d: dp, h: tcHash_(dp), t: ahora };
   }
   return out;
+}
+
+/**
+ * v2.0.49: por qué quedó desierto un paquete (o grupo de evaluación): qué pasó con cada propuesta registrada, en qué etapa y por qué.
+ * Los nombres de personas naturales (RUC 10 o productor registrado como persona natural) no se publican.
+ */
+function tcMotivoDesierto_(proc, clave, ev) {
+  var reg = Calc.postoresRegistrados(proc, clave);
+  if (!reg.length) return 'No se presentaron propuestas.';
+  var af = proc.modalidad === 'AF', partes = [], porN = {};
+  ((ev && (af ? ev.postores : ev.prelacion)) || []).forEach(function (x) { porN[x.n] = x; });
+  var nom = function (p) {
+    return p.persona === true || /^10\d{9}$/.test(String(p.ruc || '').trim()) ? 'Postor ' + p.n + ' (persona natural)' : (String(p.nombre || '').trim() || 'Postor ' + p.n);
+  };
+  var ETAPA = { 'Evaluación documentaria': 'en la evaluación documentaria', 'Evaluación de almacenes': 'en la evaluación de almacenes' };
+  var CRIT = ['el sobre no tiene el Anexo N° 6-B', 'el formato de cotización está incompleto', 'el formato de cotización fue modificado'];
+  reg.forEach(function (p) {
+    var e = Calc.etapaPostor(proc, clave, p), mot = String(e.motivo || '').trim();
+    if (!e.pasa) {
+      partes.push(nom(p) + ': ' + (e.resultado === 'NO ADMITIDA' ? 'propuesta no admitida' : (e.resultado === 'DESCALIFICADO' ? 'descalificado ' : 'no apto ') + (ETAPA[e.etapa] || '')) +
+        (mot ? ' (' + mot.replace(/\.$/, '') + ')' : ''));
+      return;
+    }
+    var x = porN[p.n];
+    if (!x) return;
+    if (x.resultado === 'DESCALIFICADO') partes.push(nom(p) + ': descalificado en la evaluación de cotizaciones (no cotizó ningún alimento)');
+    else if (x.resultado === 'NO APTO') {
+      var cs = [];
+      (x.c || []).forEach(function (v, i) { if (v === 'NO' && CRIT[i]) cs.push(CRIT[i]); });
+      if (!af && ev.total && x.cotizados < ev.total) cs.push('cotizó ' + x.cotizados + ' de ' + ev.total + ' alimentos');
+      partes.push(nom(p) + ': no apto en la evaluación de cotizaciones' + (cs.length ? ' (' + cs.join('; ') + ')' : ''));
+    } else if (x.resultado === 'APTO' && !af) partes.push(nom(p) + ': apto, pero no suscribe el acta');
+  });
+  var t = (reg.length === 1 ? 'Única propuesta. ' : reg.length + ' propuestas. ') + (partes.length ? partes.join('; ') + '.' : 'Ninguna propuesta resultó apta.');
+  return t.length > 600 ? t.slice(0, 597) + '…' : t;
 }
 
 /** Escrituras de un proceso armado: su documento y el de precios (o el borrado de precios si ya no tiene). */
