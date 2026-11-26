@@ -362,13 +362,14 @@
 
     // resultados por paquete
     if (paqs.length) {
-      h += '<div class="card"><h2>Resultados por paquete</h2><div class="scroll"><table class="tb"><thead><tr><th>UT/OCT · Zona o CG</th><th>Modalidad</th><th>Paquete</th><th>Resultado</th><th>Proveedor(es) adjudicado(s)</th><th class="n">Precio final ofertado</th><th class="n">Propuestas</th></tr></thead><tbody>' +
+      h += '<div class="card"><h2>Resultados por paquete</h2><div class="scroll"><table class="tb"><thead><tr><th>UT/OCT · Zona o CG</th><th>Modalidad</th><th>Paquete</th><th>Resultado</th><th>Proveedor(es) adjudicado(s) o motivo del desierto</th><th class="n">Precio final ofertado</th><th class="n">Propuestas</th></tr></thead><tbody>' +
         ordenar(conRes).map(function (p) {
           return Object.keys(p.resPaq).map(function (k) {
             var rs = (p.res || []).filter(function (r) { return r.p === k; }), gan = ganadores(p, k), o = {}; o[k] = p.resPaq[k];
+            var mot = p.resPaq[k] === 'desierto' && p.md && p.md[k] ? p.md[k] : '';   // v2.0.49: qué pasó con cada propuesta
             return '<tr><td><button class="lnk" data-abrir="' + esc(p.id) + '">' + esc(p.utn) + ' · ' + esc(p.zona) + '</button></td><td>' + chipMod(p.mod) + '</td><td>' + esc(k) + ' <span class="muted">' + esc((rs[0] || {}).np || '') + '</span></td><td>' +
-              resultadoTxt({ resPaq: o }, true) + '</td><td class="sm">' + (gan.length ? gan.map(function (g) { return esc(g.nom) + (g.k ? ' <span class="muted">(' + num(g.k) + ' alimento' + (g.k === 1 ? '' : 's') + ')</span>' : ''); }).join('<br>') : '<span class="muted">-</span>') +
-              '</td><td class="n">' + (p.mod !== 'AF' && gan.length === 1 && gan[0].pf !== null && gan[0].pf !== undefined ? L.soles(gan[0].pf) : '<span class="muted">-</span>') + '</td><td class="n">' + num(rs.length) + '</td></tr>';
+              resultadoTxt({ resPaq: o }, true) + '</td><td class="sm">' + (gan.length ? gan.map(function (g) { return esc(g.nom) + (g.k ? ' <span class="muted">(' + num(g.k) + ' alimento' + (g.k === 1 ? '' : 's') + ')</span>' : ''); }).join('<br>') : (mot ? '<div class="md"><b>Motivo:</b> ' + esc(mot) + '</div>' : '<span class="muted">-</span>')) +
+              '</td><td class="n">' + (p.mod !== 'AF' && gan.length === 1 && gan[0].pf !== null && gan[0].pf !== undefined ? L.soles(gan[0].pf) : '<span class="muted">-</span>') + '</td><td class="n">' + num(p.npq && p.npq[k] !== undefined ? p.npq[k] : rs.length) + '</td></tr>';   // v2.0.49: npq cuenta también las que no llegaron a cotización
           }).join('');
         }).join('') + '</tbody></table></div></div>';
     }
@@ -454,7 +455,8 @@
     // ámbito
     h += '<section><h3>Ámbito y paquetes</h3><div class="m-amb"><span><b>' + num(p.ncg) + '</b> CG</span><span><b>' + num(p.nsa) + '</b> SA</span><span><b>' + num(p.nin) + '</b> niñas y niños</span><span><b>' + num(p.nali) + '</b> alimentos</span><span><b>' + num(p.npos) + '</b> propuestas</span></div>' +
       (p.prov ? '<p><span class="muted">Provincias:</span> ' + esc(p.prov) + '</p>' : '') + (p.dist ? '<p><span class="muted">Distritos:</span> ' + esc(p.dist) + '</p>' : '') +
-      ((p.paqs || []).length ? '<ul class="paqs">' + p.paqs.map(function (q) { return '<li><b>' + esc(q.c) + '</b> ' + esc(q.n) + (p.resPaq && p.resPaq[q.c] ? ' · ' + resultadoTxt({ resPaq: (function () { var o = {}; o[q.c] = p.resPaq[q.c]; return o; })() }) : '') + '</li>'; }).join('') + '</ul>' : '') + '</section>';
+      ((p.paqs || []).length ? '<ul class="paqs">' + p.paqs.map(function (q) { return '<li><b>' + esc(q.c) + '</b> ' + esc(q.n) + (p.resPaq && p.resPaq[q.c] ? ' · ' + resultadoTxt({ resPaq: (function () { var o = {}; o[q.c] = p.resPaq[q.c]; return o; })() }) : '') +
+        (p.resPaq && p.resPaq[q.c] === 'desierto' && p.md && p.md[q.c] ? '<div class="md"><b>Motivo del desierto:</b> ' + esc(p.md[q.c]) + '</div>' : '') + '</li>'; }).join('') + '</ul>' : '') + '</section>';
     // resultados
     if ((p.res || []).length) {
       var g = {}; p.res.forEach(function (r) { (g[r.p] = g[r.p] || []).push(r); });
