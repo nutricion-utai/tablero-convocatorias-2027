@@ -262,7 +262,9 @@
         // cada día, agrupado por UT/OCT (y en cada una, sus zonas o CG con el acto del día) o por etapa del proceso (y en cada una, las UT/OCT y zonas)
         var porActo = S.agAgr === 'acto';
         return '<div class="ag-dia"><div class="ag-f"><b>' + nom.charAt(0).toUpperCase() + nom.slice(1) + '</b><span>' + L.fecha(d) + '</span></div>' + (porActo ? L.agendaPorActo(dias[d]) : L.agendaPorUT(dias[d])).map(function (g) {
-          return '<div class="ag-ut"><div class="ag-utn">' + esc(g.titulo) + (g.nProc > 1 ? ' <span class="muted">· ' + g.nProc + ' procesos</span>' : '') + '</div><ul>' + g.xs.map(function (x) {
+          // por UT/OCT, el nombre filtra todo el tablero por esa UT/OCT (otro clic quita el filtro)
+          var tit = !porActo && g.ut ? '<button class="lnk" data-utag="' + esc(g.ut) + '" title="' + (S.f.ut === g.ut ? 'Quitar el filtro de esta UT/OCT' : 'Ver solo esta UT/OCT en todo el tablero') + '">' + esc(g.titulo) + '</button>' : esc(g.titulo);
+          return '<div class="ag-ut"><div class="ag-utn">' + tit + (g.nProc > 1 ? ' <span class="muted">· ' + g.nProc + ' procesos</span>' : '') + '</div><ul>' + g.xs.map(function (x) {
             var cierra = x.hasta === d, empieza = x.desde === d;
             var est = '<span class="muted">' + (empieza && cierra ? '(un día)' : empieza ? '(empieza; hasta el ' + L.fechaCorta(x.hasta) + ')' : cierra ? '(último día)' : '(en curso; hasta el ' + L.fechaCorta(x.hasta) + ')') + '</span>';
             return '<li><div><button class="lnk" data-abrir="' + esc(x.p.id) + '">' + (porActo ? esc(x.p.utn) + ' · ' : '') + esc(x.p.zona) + '</button> ' + chipMod(x.p.mod) + '</div><div class="ag-l2">' +
@@ -554,12 +556,13 @@
       if (d.matches('details[data-actg]')) { if (d.open) S.actAbiertos.add(d.getAttribute('data-actg')); else S.actAbiertos.delete(d.getAttribute('data-actg')); }
     }, true);
     document.addEventListener('click', function (ev) {
-      var t = ev.target.closest('[data-abrir],[data-est],[data-paso],[data-acto],[data-ut],[data-quitar],[data-ali],[data-agagr],#csv,.cerrar,#modal');
+      var t = ev.target.closest('[data-abrir],[data-est],[data-paso],[data-acto],[data-ut],[data-quitar],[data-ali],[data-agagr],[data-utag],#csv,.cerrar,#modal');
       if (!t) return;
       if (t.id === 'modal') { if (ev.target === t) cerrar(); return; }
       if (t.classList.contains('cerrar')) { cerrar(); return; }
       if (t.id === 'csv') { descargarCSV(); return; }
       if (t.hasAttribute('data-abrir')) { abrir(t.getAttribute('data-abrir')); return; }
+      if (t.hasAttribute('data-utag')) { var cu = t.getAttribute('data-utag'); S.f.ut = S.f.ut === cu ? '' : cu; opcionesFiltros(); guardarFiltros(); programar(); window.scrollTo({ top: 0 }); return; }
       if (t.hasAttribute('data-agagr')) { S.agAgr = t.getAttribute('data-agagr') === 'acto' ? 'acto' : 'ut'; try { localStorage.setItem('conv2027_agagr', S.agAgr); } catch (e) { } programar(); return; }
       if (t.hasAttribute('data-quitar')) { S.f[t.getAttribute('data-quitar')] = ''; guardarFiltros(); programar(); return; }
       if (t.hasAttribute('data-ut')) { S.f.ut = t.getAttribute('data-ut'); opcionesFiltros(); guardarFiltros(); cambiarVista('pro'); window.scrollTo({ top: 0 }); return; }

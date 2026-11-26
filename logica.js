@@ -164,7 +164,7 @@
     return Object.keys(g).sort(function (a, b) { return a.localeCompare(b, 'es'); }).map(function (ut) {
       var xs = g[ut].slice().sort(function (a, b) { return ordenZona(a.p.zona, b.p.zona) || a.i - b.i; }), ids = {};
       xs.forEach(function (x) { ids[x.p.id] = true; });
-      return { titulo: ut, xs: xs, nProc: Object.keys(ids).length };
+      return { titulo: ut, ut: xs[0].p.ut, xs: xs, nProc: Object.keys(ids).length };
     });
   }
   /** Agenda de un día agrupada por etapa (acto del cronograma, en el orden del proceso) y, dentro, por UT/OCT y zona o CG. */
