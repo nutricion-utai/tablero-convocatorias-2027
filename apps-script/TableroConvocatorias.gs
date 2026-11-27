@@ -24,6 +24,9 @@
  *     pasó con cada propuesta (no admitida, no apta o descalificada, en qué etapa
  *     y por qué), y el número de propuestas registradas por paquete (npq), que
  *     incluye las que no llegaron a la evaluación de cotizaciones.
+ *   - v2.0.50: un paquete solo figura desierto cuando su evaluación terminó (un
+ *     postor sin cotización evaluada queda pendiente) y los pasos marcados como
+ *     completos son solo los que se alcanzaron en orden.
  *   - Los procesos de prueba no se publican (y se retiran si cambian a prueba).
  *   - Un activador revisa cada hora todos los procesos y corrige diferencias
  *     (cambios hechos a mano en la base, usuarios, sectorización).
@@ -258,7 +261,7 @@ function tcConstruir_(proc, idx, ctx) {
   Calc.PASOS_PROCESO.forEach(function (k) {
     if (k === 'herramienta') return;
     var x = pr && pr.pasos[k];
-    pasos[k] = x ? [x.ok ? 1 : 0, x.datos ? 1 : 0] : [0, 0];
+    pasos[k] = x ? [(pr.hecho ? pr.hecho[k] : x.ok) ? 1 : 0, x.datos ? 1 : 0] : [0, 0];
   });
 
   // resultados por paquete (prelación en convocatoria pública; postores en agricultura familiar)
@@ -286,7 +289,9 @@ function tcConstruir_(proc, idx, ctx) {
   } catch (e) { console.warn('Precios de ' + proc.id + ': ' + e.message); }
 
   var resPaq = {};
-  String(idx.resultado || '').split(/\s+/).filter(String).forEach(function (x) { var y = x.split(':'); if (y[0]) resPaq[y[0]] = y[1] || ''; });
+  // v2.0.50: «en evaluación» lleva un espacio: se lee cada «paquete:resultado» completo (antes quedaba «en» y un paquete «evaluación»)
+  var reRes = /(\S+?):(adjudicado|desierto|en evaluación)/g, mRes, txtRes = String(idx.resultado || '');
+  while ((mRes = reRes.exec(txtRes))) resPaq[mRes[1]] = mRes[2];
   // v2.0.49: motivo de cada paquete desierto (solo si hay alguno, para no cambiar los demás documentos)
   var md = {};
   Object.keys(resPaq).forEach(function (k) {
